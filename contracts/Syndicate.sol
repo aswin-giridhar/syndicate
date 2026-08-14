@@ -100,6 +100,8 @@ contract Syndicate {
         /// Portion of `cover` ceded to the reinsurance book.
         uint256 ceded;
         uint32 termDays;
+        /// After this timestamp, silence from the agent is itself a breach.
+        uint64 deadline;
         bool resolved;
     }
 
@@ -109,6 +111,9 @@ contract Syndicate {
     mapping(bytes32 => mapping(address => uint256)) public sharesOf;
     mapping(uint256 => Policy) public policies;
     mapping(bytes32 => mapping(uint256 => bool)) public usedNonce;
+    /// Job nonces the agent has already accepted — blocks replaying one
+    /// acceptance signature across several policies.
+    mapping(bytes32 => mapping(uint256 => bool)) public usedJobNonce;
 
     /// Cover outstanding per model family, across every agent. This is the
     /// quantity a per-agent pool structurally cannot see.
@@ -143,7 +148,9 @@ contract Syndicate {
         uint256 rateBps,
         uint256 ceded
     );
+    event PolicyAccepted(uint256 indexed policyId, bytes32 indexed agentId, uint256 jobNonce, uint64 deadline);
     event ReceiptAccepted(uint256 indexed policyId, bytes32 indexed agentId, address actualRecipient, uint256 amount);
+    event Expired(uint256 indexed policyId, bytes32 indexed agentId, uint64 deadline);
     event Breach(uint256 indexed policyId, bytes32 indexed agentId, address expectedRecipient, address actualRecipient);
     event ClaimPaid(uint256 indexed policyId, bytes32 indexed agentId, address indexed beneficiary, uint256 amount);
     event PoolSlashed(bytes32 indexed agentId, uint256 amount, uint256 poolAfter);
@@ -162,6 +169,7 @@ contract Syndicate {
     error NonceUsed();
     error InsufficientShares();
     error BadTerm();
+    error NotExpired(uint64 deadline);
 
     constructor(address validationRegistry_) {
         validationRegistry = IValidationRegistry(validationRegistry_);
@@ -314,15 +322,42 @@ contract Syndicate {
 
     // ------------------------------------------------------------------ policy
 
-    /// @notice Bind cover on a single upcoming payment to `expectedRecipient`.
-    function bindPolicy(bytes32 agentId, address expectedRecipient, uint256 cover, uint256 termDays)
+    /// @notice The digest an agent runtime signs to accept a job before cover is
+    ///         bound on it.
+    /// @dev Acceptance is what makes silence attributable. Without it, a buyer
+    ///      could bind cover, never give the agent any work, wait for the deadline
+    ///      and collect the full cover for the price of a premium — a larger hole
+    ///      than the one the deadline closes. Requiring the agent's own signature
+    ///      up front means every bound policy corresponds to work it took on.
+    function acceptanceDigest(bytes32 agentId, uint256 jobNonce, address expectedRecipient, uint256 cover)
         public
-        payable
-        returns (uint256 policyId)
+        view
+        returns (bytes32)
     {
+        return keccak256(
+            abi.encode(block.chainid, address(this), "syndicate.accept", agentId, jobNonce, expectedRecipient, cover)
+        );
+    }
+
+    /// @notice Bind cover on a single upcoming payment to `expectedRecipient`.
+    /// @param jobNonce Buyer-chosen identifier for the job, signed by the agent.
+    /// @param acceptance Agent runtime's signature over `acceptanceDigest`.
+    function bindPolicy(
+        bytes32 agentId,
+        address expectedRecipient,
+        uint256 cover,
+        uint256 termDays,
+        uint256 jobNonce,
+        bytes calldata acceptance
+    ) public payable returns (uint256 policyId) {
         Agent storage a = agents[agentId];
         if (!a.registered) revert UnknownAgent();
         if (cover == 0) revert ZeroAmount();
+
+        if (usedJobNonce[agentId][jobNonce]) revert NonceUsed();
+        bytes32 accepted = acceptanceDigest(agentId, jobNonce, expectedRecipient, cover);
+        if (_recover(_ethSigned(accepted), acceptance) != a.runtimeKey) revert BadSignature();
+        usedJobNonce[agentId][jobNonce] = true;
 
         uint256 rate = rateBps(agentId, cover, termDays);
         uint256 premium = (cover * rate) / BPS;
@@ -349,19 +384,23 @@ contract Syndicate {
             premium: premium,
             ceded: ceded,
             termDays: uint32(termDays),
+            deadline: uint64(block.timestamp + termDays * 1 days),
             resolved: false
         });
 
         emit PolicyBound(policyId, agentId, msg.sender, cover, premium, rate, ceded);
+        emit PolicyAccepted(policyId, agentId, jobNonce, uint64(block.timestamp + termDays * 1 days));
         _requestValidation(agentId, policyId);
     }
 
-    function bindPolicy(bytes32 agentId, address expectedRecipient, uint256 cover)
-        external
-        payable
-        returns (uint256)
-    {
-        return bindPolicy(agentId, expectedRecipient, cover, BASE_TERM_DAYS);
+    function bindPolicy(
+        bytes32 agentId,
+        address expectedRecipient,
+        uint256 cover,
+        uint256 jobNonce,
+        bytes calldata acceptance
+    ) external payable returns (uint256) {
+        return bindPolicy(agentId, expectedRecipient, cover, BASE_TERM_DAYS, jobNonce, acceptance);
     }
 
     /// @notice The digest an agent runtime must sign for a payment receipt.
@@ -412,26 +451,63 @@ contract Syndicate {
 
         bool breached = actualRecipient != p.expectedRecipient;
         if (breached) {
-            a.failures += 1;
             emit Breach(policyId, p.agentId, p.expectedRecipient, actualRecipient);
-
-            // Quota share in the loss direction: the junior tranche pays its
-            // retention, the book pays its cession, each capped by what it holds.
-            uint256 fromPool = retained > a.pool ? a.pool : retained;
-            uint256 fromBook = p.ceded > bookCapital ? bookCapital : p.ceded;
-
-            a.pool -= fromPool;
-            bookCapital -= fromBook;
-            emit PoolSlashed(p.agentId, fromPool, a.pool);
-            emit BookSlashed(p.agentId, fromBook, bookCapital);
-
-            uint256 payout = fromPool + fromBook;
-            (bool ok,) = p.beneficiary.call{value: payout}("");
-            require(ok, "payout failed");
-            emit ClaimPaid(policyId, p.agentId, p.beneficiary, payout);
+            _payClaim(policyId, p, a, retained);
         }
 
         _respondValidation(p.agentId, policyId, breached ? RESPONSE_BREACH : RESPONSE_CLEAN, digest);
+    }
+
+    /// @notice Resolve a policy whose agent never accounted for the payment.
+    /// @dev The failure mode a receipt alone cannot cover. An agent that has been
+    ///      fully compromised does not sign an incriminating receipt — it goes
+    ///      quiet, and without this the policy would sit unresolved forever with
+    ///      the buyer uncovered and the underwriters' capital locked.
+    ///
+    ///      Silence is therefore treated as a breach. That is only fair because
+    ///      the agent signed an acceptance at bind time: every policy corresponds
+    ///      to work it took on, so failing to account for it is non-performance,
+    ///      not absence of a job.
+    ///
+    ///      Permissionless: anyone may call it, because everyone with capital at
+    ///      stake wants stale exposure cleared, and the outcome is fixed by the
+    ///      deadline rather than by who calls.
+    function resolveExpired(uint256 policyId) external {
+        Policy storage p = policies[policyId];
+        if (p.cover == 0 || p.resolved) revert PolicyResolved();
+        if (block.timestamp <= p.deadline) revert NotExpired(p.deadline);
+
+        Agent storage a = agents[p.agentId];
+        uint256 retained = p.cover - p.ceded;
+
+        p.resolved = true;
+        a.exposure -= retained;
+        bookExposure -= p.ceded;
+        familyExposure[a.modelFamily] -= p.cover;
+        a.trials += 1;
+
+        emit Expired(policyId, p.agentId, p.deadline);
+        _payClaim(policyId, p, a, retained);
+        _respondValidation(p.agentId, policyId, RESPONSE_BREACH, bytes32(0));
+    }
+
+    /// @dev Quota share in the loss direction: the junior tranche pays its
+    ///      retention, the book pays its cession, each capped by what it holds.
+    function _payClaim(uint256 policyId, Policy storage p, Agent storage a, uint256 retained) private {
+        a.failures += 1;
+
+        uint256 fromPool = retained > a.pool ? a.pool : retained;
+        uint256 fromBook = p.ceded > bookCapital ? bookCapital : p.ceded;
+
+        a.pool -= fromPool;
+        bookCapital -= fromBook;
+        emit PoolSlashed(p.agentId, fromPool, a.pool);
+        emit BookSlashed(p.agentId, fromBook, bookCapital);
+
+        uint256 payout = fromPool + fromBook;
+        (bool ok,) = p.beneficiary.call{value: payout}("");
+        require(ok, "payout failed");
+        emit ClaimPaid(policyId, p.agentId, p.beneficiary, payout);
     }
 
     // ------------------------------------------------------------- ERC-8004 I/O

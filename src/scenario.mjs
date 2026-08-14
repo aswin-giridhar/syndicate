@@ -6,7 +6,7 @@
 
 import { parseEventLogs, keccak256, toHex } from "viem";
 import {
-  deploy, contract, registryContract, agentId, accounts, signReceipt, ABI,
+  deploy, contract, registryContract, agentId, accounts, signReceipt, signAcceptance, advanceTime, ABI,
   parseEther, VENDOR,
 } from "./chain/client.mjs";
 
@@ -78,8 +78,14 @@ export async function runScenario(emit = () => {}) {
     const a = state.agents[name];
 
     const premium = await c.read("quote", [a.id, cover, TERM_DAYS]);
+    // The agent counter-signs the job before cover is bound on it.
+    const jobNonce = nonce * 1000n;
+    const acceptance = await signAcceptance({
+      address, runtimeKeyName: meta.runtimeKeyName,
+      agentId: a.id, jobNonce, expectedRecipient: VENDOR, cover,
+    });
     const { receipt: bindReceipt } = await c.write(
-      "buyer", "bindPolicy", [a.id, VENDOR, cover, TERM_DAYS], premium,
+      "buyer", "bindPolicy", [a.id, VENDOR, cover, TERM_DAYS, jobNonce, acceptance], premium,
     );
     const bound = parseEventLogs({ abi: ABI, eventName: "PolicyBound", logs: bindReceipt.logs })[0];
     const policyId = bound.args.policyId;
@@ -148,7 +154,66 @@ export async function runScenario(emit = () => {}) {
       { name, value: value.toString() });
   }
 
-  // 8. Correlation. Both agents run on the same base model, so cover written on
+  // 8. The failure a receipt cannot cover: an agent that goes dark.
+  //    A fully compromised runtime does not sign an incriminating receipt — it
+  //    stops answering. Without a deadline the policy would never resolve, the
+  //    buyer would stay uncovered and the underwriters' capital would stay locked.
+  {
+    const name = "northwind-procure-v0";
+    const id = agentId(name);
+    const label = "Procure-Bot v0 (goes dark)";
+    await c.write("deployer", "registerAgent",
+      [id, 3n, accounts.ghostRuntime.address, MODEL_FAMILY, `https://agents.local/${name}`]);
+    await c.write("underwriterA", "underwrite", [id], parseEther("10"));
+
+    const premium = await c.read("quote", [id, cover, TERM_DAYS]);
+    const jobNonce = 9001n;
+    const acceptance = await signAcceptance({
+      address, runtimeKeyName: "ghostRuntime",
+      agentId: id, jobNonce, expectedRecipient: VENDOR, cover,
+    });
+    const { receipt: bindReceipt } = await c.write(
+      "buyer", "bindPolicy", [id, VENDOR, cover, TERM_DAYS, jobNonce, acceptance], premium,
+    );
+    const bound = parseEventLogs({ abi: ABI, eventName: "PolicyBound", logs: bindReceipt.logs })[0];
+    const policyId = bound.args.policyId;
+    say("bound", `${label} counter-signed the job and ${fmt(cover)} of cover was bound`,
+      { name, policyId: policyId.toString() });
+
+    say("agent-run", `${label} takes the job — and never accounts for it`, { name });
+
+    // Confirm the contract refuses to settle before the deadline, rather than
+    // assuming it does.
+    let rejected = false;
+    try {
+      await c.write("buyer", "resolveExpired", [policyId]);
+    } catch {
+      rejected = true;
+    }
+    say(rejected ? "guard" : "error",
+      rejected
+        ? `Claim refused before the deadline — an agent still has its full term to perform`
+        : `resolveExpired settled early, which it must not`,
+      { name });
+
+    await advanceTime(31n * 24n * 60n * 60n);
+    const { receipt } = await c.write("buyer", "resolveExpired", [policyId]);
+    const events = parseEventLogs({ abi: ABI, logs: receipt.logs });
+    const paid = events.find((e) => e.eventName === "ClaimPaid");
+    const expired = events.find((e) => e.eventName === "Expired");
+
+    say(expired ? "breach" : "error",
+      expired
+        ? `Deadline passed with no receipt — silence settled as a breach, ${fmt(paid.args.amount)} paid to the buyer`
+        : `policy failed to expire`,
+      { name, tx: receipt.transactionHash });
+
+    const [pool, , trials, failures] = await c.read("agentStats", [id]);
+    say("stats", `${label}: pool ${fmt(pool)}, trials ${trials}, failures ${failures}`,
+      { name, pool: pool.toString(), trials: Number(trials), failures: Number(failures) });
+  }
+
+  // 9. Correlation. Both agents run on the same base model, so cover written on
   //    one adds to the same concentration the other is priced against. A pool
   //    scoped to a single agent structurally cannot see this.
   {

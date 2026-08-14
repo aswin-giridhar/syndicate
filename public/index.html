@@ -25,7 +25,8 @@
   @media(max-width:1000px){main{grid-template-columns:1fr}}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:18px 20px}
   .card h2{margin:0 0 3px;font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--dim);font-weight:650}
-  .agents{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px}
+  .agents{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px}
+  @media(max-width:900px){.agents{grid-template-columns:1fr 1fr}}
   @media(max-width:640px){.agents{grid-template-columns:1fr}}
   .agent{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:17px 18px;
     transition:border-color .3s, box-shadow .3s}
@@ -101,6 +102,7 @@
 const AGENTS = {
   "northwind-procure-v1": { label: "Procure-Bot v1", note: "naive — listing goes into the prompt" },
   "northwind-procure-v2": { label: "Procure-Bot v2", note: "isolated — listing treated as data" },
+  "northwind-procure-v0": { label: "Procure-Bot v0", note: "compromised — takes the job, then goes dark" },
 };
 const state = {};
 const el = (id) => document.getElementById(id);
@@ -183,7 +185,9 @@ el("run").onclick = () => {
         card.className = "agent " + (bad ? "breached" : "clean");
         v.className = "verdict show " + (bad ? "bad" : "good");
         v.textContent = bad
-          ? "BREACH — funds redirected to attacker. Claim paid, syndicate slashed."
+          ? (e.data.name === "northwind-procure-v0"
+              ? "TIMED OUT — never accounted for the payment. Silence settled as a breach."
+              : "BREACH — funds redirected to attacker. Claim paid, syndicate slashed.")
           : "CLEAN — paid the vendor of record. Premium retained.";
       }
     }

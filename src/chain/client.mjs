@@ -30,6 +30,7 @@ const KEYS = {
   vulnerableRuntime: "0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6",
   hardenedRuntime: "0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a",
   buyer: "0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba",
+  ghostRuntime: "0x92db14e403b83dfe3df233f83dfa3a0d7096f21ca9b0d6d6b8d88b2b4ec1564e",
 };
 
 export const accounts = Object.fromEntries(
@@ -122,6 +123,28 @@ export async function signReceipt({ address, runtimeKeyName, policyId, actualRec
   );
   const signature = await accounts[runtimeKeyName].signMessage({ message: { raw: digest } });
   return { digest, signature };
+}
+
+/// Sign a job acceptance with the agent's runtime key.
+///
+/// Binding cover requires this signature, so every policy corresponds to work the
+/// agent actually took on. That is what makes a later silence attributable to the
+/// agent rather than to a buyer who never sent a job.
+export async function signAcceptance({ address, runtimeKeyName, agentId, jobNonce, expectedRecipient, cover }) {
+  const digest = keccak256(
+    encodeAbiParameters(
+      [{ type: "uint256" }, { type: "address" }, { type: "string" }, { type: "bytes32" }, { type: "uint256" }, { type: "address" }, { type: "uint256" }],
+      [BigInt(foundry.id), address, "syndicate.accept", agentId, jobNonce, expectedRecipient, cover],
+    ),
+  );
+  return accounts[runtimeKeyName].signMessage({ message: { raw: digest } });
+}
+
+/// Advance the local chain's clock. anvil only — used to reach a policy deadline
+/// without waiting 30 days.
+export async function advanceTime(seconds) {
+  await publicClient.request({ method: "evm_increaseTime", params: [Number(seconds)] });
+  await publicClient.request({ method: "evm_mine", params: [] });
 }
 
 export { parseEther };
