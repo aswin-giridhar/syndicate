@@ -115,6 +115,44 @@ actually survive them — is the first on-site work item.
 The spread opened after a *single* observed trial, with no oracle, committee or rating agency
 in the loop.
 
+## It writes to ERC-8004, rather than sitting beside it
+
+Syndicate registers as a **validator** in the ERC-8004 Validation Registry. Binding a policy
+opens a `validationRequest`; settling a receipt writes a `validationResponse` scored 100 (clean)
+or 0 (breach), tagged `syndicate.settlement`, with the receipt digest as the response hash.
+
+Any agent already reading the standard therefore sees a verdict backed by capital, alongside the
+Sybil-farmed feedback in the Reputation Registry. The interface in `IValidationRegistry.sol` is
+transcribed from the EIP; the local `ValidationRegistry.sol` is a reference implementation so the
+demo genuinely executes the standard's call path, and the scenario **reads the verdict back out**
+after writing it rather than assuming the write landed.
+
+## Actuarial structure
+
+**Reinsurance — a shared book, senior to every agent pool.** Per-agent pools are the junior
+tranche. A shared reinsurance book takes a 30% quota share of every policy: 30% of the premium,
+and 30% of any loss. Underwriters can back a single agent they have opinions about, or take
+diversified exposure to the whole book.
+
+**Correlation — the term a per-agent pool cannot express.** Each agent declares a model family.
+Agents sharing a base model share its failure modes: one newly discovered injection technique
+against that model breaches every agent built on it in the same afternoon. Losses a diversified
+book treats as independent arrive together. Syndicate tracks cover outstanding *per family across
+all agents* and surcharges concentration quadratically — a diversified book barely feels it, a
+concentrated one is bitten hard. It is the agent-economy analogue of writing every policy on one
+flood plain.
+
+Measured, same agent and same loss record, only the exposure differing:
+
+| Cover on one model family | Rate |
+|---|---|
+| 0.5 ETH | 9.76% |
+| 4 ETH | **16.22%** |
+
+**Term structure.** Risk accrues with exposure time; the floor rate does not. A 90-day policy
+carries three times the chance of meeting a bad day, so the risk loads scale with duration while
+`BASE_RATE_BPS` stays flat — 9.76% at 30 days against 28.28% at 90.
+
 ## Design notes
 
 **Pricing is actuarial, not a heuristic.** `rateBps` blends observed loss experience against an
@@ -152,21 +190,26 @@ nonce-guarded and bound to the chain id and contract address, so they cannot be 
   from untrusted regions of its context — but it is a last-address-wins rule, not a model being
   reasoned out of its instructions. **The live-LLM run is the real demonstration of the attack;
   the stand-in exists so the chain-side flow stays runnable without an API key.**
-- Underwriter capital is currently unpooled across agents and there is no reinsurance,
-  correlation modelling, or premium term structure. Those are real actuarial gaps, listed here
-  rather than hidden.
+- Reinsurance, correlation pricing and term structure are implemented and exercised, but they are
+  **structurally correct rather than calibrated** — the loadings are reasoned defaults, not fitted
+  to loss data that does not exist yet. No claims history for agent breaches exists anywhere.
+- Deployment to Base Sepolia is scripted (`npm run deploy`) and preflight-checks its own balance,
+  but **has not been run** — the deployer address is unfunded. Nothing here claims otherwise.
 - No prior work. Every line in this repository was written during the hackathon period.
 
 ## Layout
 
 ```
-contracts/Syndicate.sol   underwriting pool, pricing, receipts, claims, slashing
-app/chain.mjs             deployment + typed contract helpers + receipt signing
-app/agents.mjs            the two payment agents and the poisoned listing
-app/scenario.mjs          end-to-end run, emitting structured events
-app/server.mjs            dashboard server with an SSE feed of the live run
-public/index.html         dashboard
-scripts/demo.mjs          CLI runner
+contracts/Syndicate.sol            pricing, pools, reinsurance, receipts, claims, slashing
+contracts/IValidationRegistry.sol  ERC-8004 interface, transcribed from the EIP
+contracts/ValidationRegistry.sol   local reference implementation for the demo
+src/chain/client.mjs               deployment + typed contract helpers + receipt signing
+src/agents/agents.mjs              the two payment agents and the poisoned listing
+src/scenario.mjs                   end-to-end run, emitting structured events
+src/server/server.mjs              dashboard server with an SSE feed of the live run
+public/index.html                  dashboard
+script/demo.mjs                    CLI runner
+script/deploy-base-sepolia.mjs     public testnet deploy + one real settled policy
 ```
 
 The CLI and the dashboard share `runScenario`, so what you watch in the browser is the same
