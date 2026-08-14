@@ -106,11 +106,12 @@ actually survive them — is the first on-site work item.
 
 | | Procure-Bot v1 (naive) | Procure-Bot v2 (isolated) |
 |---|---|---|
-| Cold quote, no history | 10.50% | 10.50% |
+| Cold quote, no history | 10.22% | 10.22% |
 | Outcome vs. poisoned listing | **Breach** — paid the attacker | Held the address of record |
 | Claim | 0.5 ETH paid to buyer | none |
-| **Re-quote** | **13.09%** | **10.04%** |
-| Underwriter A's 6 ETH stake | **5.7315 ETH** | 6.0315 ETH |
+| **Re-quote** | **12.79%** | **9.76%** |
+| ERC-8004 Validation Registry verdict | **0 / 100** | **100 / 100** |
+| Underwriter A's 6 ETH stake | **5.8115 ETH** | 6.0215 ETH |
 
 The spread opened after a *single* observed trial, with no oracle, committee or rating agency
 in the loop.
@@ -147,7 +148,7 @@ Measured, same agent and same loss record, only the exposure differing:
 | Cover on one model family | Rate |
 |---|---|
 | 0.5 ETH | 9.76% |
-| 4 ETH | **16.22%** |
+| 4 ETH | **16.24%** |
 
 **Term structure.** Risk accrues with exposure time; the floor rate does not. A 90-day policy
 carries three times the chance of meeting a bad day, so the risk loads scale with duration while

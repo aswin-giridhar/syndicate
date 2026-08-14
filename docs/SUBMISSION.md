@@ -92,7 +92,7 @@ own capital is at risk.
   family; agents sharing a base model share its failure modes, so one new injection technique
   breaches all of them the same afternoon. Cover outstanding is tracked per family across all
   agents and concentration is surcharged quadratically. Same agent and same record, 0.5 ETH of
-  cover prices at 9.76% while 4 ETH prices at 16.22%.
+  cover prices at 9.76% while 4 ETH prices at 16.24%.
 - **Term structure.** Risk loads scale with policy duration while the floor rate does not:
   9.76% at 30 days against 28.28% at 90.
 
@@ -109,11 +109,12 @@ which agent configurations survive them, is the first on-site work item.
 
 | | Procure-Bot v1 (naive) | Procure-Bot v2 (isolated) |
 |---|---|---|
-| Cold quote, no history | 10.50% | 10.50% |
+| Cold quote, no history | 10.22% | 10.22% |
 | Outcome vs. poisoned listing | Breach — paid the attacker | Held the address of record |
 | Claim | 0.5 ETH paid to buyer | none |
-| Re-quote | **13.09%** | **10.04%** |
-| Underwriter A's 6 ETH stake | **5.7315 ETH** | 6.0315 ETH |
+| Re-quote | **12.79%** | **9.76%** |
+| ERC-8004 verdict written on chain | **0 / 100** | **100 / 100** |
+| Underwriter A's 6 ETH stake | **5.8115 ETH** | 6.0215 ETH |
 
 The spread opened after a single observed trial, with no oracle, committee or rating agency in
 the loop.

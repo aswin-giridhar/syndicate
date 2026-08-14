@@ -2,3 +2,4 @@ node_modules/
 out/
 cache/
 .env
+.playwright-mcp/

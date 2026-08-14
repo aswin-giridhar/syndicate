@@ -115,6 +115,8 @@ function renderAgents(){
       <div class="grid2">
         <div class="stat"><div class="v" id="pool-${id}">—</div><div class="k">syndicate pool</div></div>
         <div class="stat"><div class="v" id="rec-${id}">—</div><div class="k">trials / breaches</div></div>
+        <div class="stat"><div class="v" id="erc-${id}">—</div><div class="k">ERC-8004 verdict</div></div>
+        <div class="stat"><div class="v" id="uw-${id}">—</div><div class="k">underwriter A stake</div></div>
       </div>
       <div class="verdict" id="verdict-${id}"></div>
     </div>`).join("");
@@ -166,6 +168,14 @@ el("run").onclick = () => {
       if (e.type === "stats") {
         el(`pool-${id}`).textContent = eth(e.data.pool).toFixed(4) + " ETH";
         el(`rec-${id}`).textContent = `${e.data.trials} / ${e.data.failures}`;
+      }
+      if (e.type === "erc8004") {
+        const n = el(`erc-${id}`);
+        n.textContent = `${e.data.response}/100`;
+        n.style.color = e.data.response >= 50 ? "var(--pos)" : "var(--neg)";
+      }
+      if (e.type === "underwriter") {
+        el(`uw-${id}`).textContent = eth(e.data.value).toFixed(3) + " ETH";
       }
       if (e.type === "breach" || e.type === "clean") {
         const card = el(`card-${id}`), v = el(`verdict-${id}`);
