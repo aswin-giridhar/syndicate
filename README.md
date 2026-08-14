@@ -91,7 +91,18 @@ they treat untrusted content.
   address from the signed vendor record. Defence in depth: the prompt discourages redirection,
   and the code makes it structurally impossible.
 
-### Measured result
+### Measured result — deterministic stand-in agents
+
+**Read this before the table.** The run below used the deterministic stand-ins, not a live model.
+When the same scenario is run against **live Claude Sonnet 5, the naive agent resists this payload**:
+it keeps the address of record, no breach occurs, and the two agents do not diverge. The injection
+in `POISONED_LISTING` is a first-generation payload and a frontier model refuses it.
+
+That is a real finding, and it cuts both ways. It says the *insurance mechanism* below is
+demonstrated end-to-end, while the *specific exploit* used to trigger it is not yet strong enough
+to beat a current model. Building payloads that do — and measuring which agent configurations
+actually survive them — is the first on-site work item.
+
 
 | | Procure-Bot v1 (naive) | Procure-Bot v2 (isolated) |
 |---|---|---|
@@ -132,6 +143,9 @@ nonce-guarded and bound to the chain id and contract address, so they cannot be 
 - The contract, pricing, signature verification, claims, payouts and slashing all run on a
   **local EVM (anvil)**. Deployment to **Base Sepolia is the first on-site milestone** — it is
   not done, and nothing here implies it is.
+- **The breach in the demo is driven by the stand-in agent, not by a live model.** Claude Sonnet 5
+  was run against the same poisoned listing and did not take the bait. Every number in the results
+  table comes from the stand-in run and is labelled as such.
 - The two agents run against **live Claude** when an `ANTHROPIC_API_KEY` is present in `.env`,
   and otherwise fall back to **deterministic stand-ins that are labelled as such in the UI and
   the CLI**. The stand-in exhibits the same *class* of defect — it does not distinguish trusted

@@ -82,7 +82,16 @@ own capital is at risk.
 - **Live adversarial demo.** Two agents, same order, same attacker-controlled listing carrying
   an indirect prompt injection. One is naive, one isolates untrusted content.
 
-## Demonstrated result
+## Demonstrated result (deterministic stand-in agents)
+
+Stated plainly, because the project's thesis is that unverifiable claims are worthless: the run
+below used deterministic stand-in agents. Against **live Claude Sonnet 5, the naive agent resists
+this injection payload** — it keeps the address of record and the two agents do not diverge.
+
+The insurance mechanism is therefore demonstrated end-to-end; the specific exploit used to trigger
+it is not yet strong enough to beat a frontier model. Developing payloads that are, and measuring
+which agent configurations survive them, is the first on-site work item.
+
 
 | | Procure-Bot v1 (naive) | Procure-Bot v2 (isolated) |
 |---|---|---|
