@@ -1,15 +1,19 @@
 {
-  "name": "ntu_innovatex_hackathon",
+  "name": "syndicate",
   "version": "1.0.0",
-  "description": "",
+  "description": "Counterparty insurance for autonomous AI agents. The premium is the trust signal.",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "demo": "node scripts/demo.mjs",
+    "start": "node app/server.mjs",
+    "chain": "anvil",
+    "build": "forge build"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "viem": "^2.55.16"
-  }
+  },
+  "type": "module"
 }

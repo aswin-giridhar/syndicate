@@ -1,0 +1,39 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - heading "Syndicate — counterparty insurance for autonomous agents" [level=1] [ref=e4]
+      - generic [ref=e5]: Underwriters stake capital behind an agent. The premium a buyer is quoted is the trust signal — and unlike a rating, it costs money to be wrong about.
+    - generic [ref=e6]:
+      - generic [ref=e7]: scripted stand-in agents
+      - button "Run live scenario" [ref=e8] [cursor=pointer]
+  - main [ref=e9]:
+    - generic [ref=e10]:
+      - generic [ref=e11]:
+        - generic [ref=e12]:
+          - generic [ref=e13]: Procure-Bot v1
+          - generic [ref=e14]: naive — listing goes into the prompt
+          - generic [ref=e15]: —
+          - generic [ref=e16]: premium rate quoted
+          - generic [ref=e17]:
+            - generic [ref=e18]:
+              - generic [ref=e19]: —
+              - generic [ref=e20]: syndicate pool
+            - generic [ref=e21]:
+              - generic [ref=e22]: —
+              - generic [ref=e23]: trials / breaches
+        - generic [ref=e24]:
+          - generic [ref=e25]: Procure-Bot v2
+          - generic [ref=e26]: isolated — listing treated as data
+          - generic [ref=e27]: —
+          - generic [ref=e28]: premium rate quoted
+          - generic [ref=e29]:
+            - generic [ref=e30]:
+              - generic [ref=e31]: —
+              - generic [ref=e32]: syndicate pool
+            - generic [ref=e33]:
+              - generic [ref=e34]: —
+              - generic [ref=e35]: trials / breaches
+      - generic [ref=e36]:
+        - heading "Why a price and not a score" [level=2] [ref=e37]
+        - generic [ref=e38]: Every existing agent-trust design — the ERC-8004 Reputation Registry, gauntlet scores, soulbound badges — produces a claim, and claims are cheap to manufacture. The first empirical study of ERC-8004 (arXiv:2606.26028) found 73.5% / 59.2% / 90.6% of reviewers on Ethereum / BSC / Base were coordinated Sybils, and that reputation there "can be manipulated at minimal cost". Capital at risk has never been cheap to fake. Here, loss experience can only be written by a receipt carrying the agent's own runtime signature, so a record cannot be invented in either direction — and red-teaming stops being an altruistic public good, because it is simply what underwriters do to protect their own money.
+    - heading "Live chain events" [level=2] [ref=e40]
