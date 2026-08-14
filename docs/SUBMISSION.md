@@ -81,6 +81,20 @@ own capital is at risk.
   which a signature over the payment tuple settles exactly.
 - **Live adversarial demo.** Two agents, same order, same attacker-controlled listing carrying
   an indirect prompt injection. One is naive, one isolates untrusted content.
+- **ERC-8004 write-through.** Syndicate registers as a validator in the ERC-8004 Validation
+  Registry: binding a policy opens a `validationRequest`, settling a receipt writes a
+  `validationResponse` scored 100 or 0 with the receipt digest attached. It extends the standard
+  it critiques instead of sitting beside it, so any agent already reading ERC-8004 sees a verdict
+  backed by capital next to the Sybil-farmed feedback.
+- **Reinsurance.** Per-agent pools are the junior tranche; a shared book takes a 30% quota share
+  of every premium and every loss, so underwriters can back one agent or the diversified book.
+- **Correlation pricing — the term a per-agent pool cannot express.** Agents declare a model
+  family; agents sharing a base model share its failure modes, so one new injection technique
+  breaches all of them the same afternoon. Cover outstanding is tracked per family across all
+  agents and concentration is surcharged quadratically. Same agent and same record, 0.5 ETH of
+  cover prices at 9.76% while 4 ETH prices at 16.22%.
+- **Term structure.** Risk loads scale with policy duration while the floor rate does not:
+  9.76% at 30 days against 28.28% at 90.
 
 ## Demonstrated result (deterministic stand-in agents)
 
@@ -136,6 +150,7 @@ slashing all execute against a real EVM (anvil) — real deployment, real ECDSA 
 reverts, real transaction hashes. The CLI and the dashboard share one code path, so there is no
 separate demo mode that can drift from the real one.
 
-Explicitly not done: deployment to Base Sepolia is the first on-site milestone. Underwriter
-capital is unpooled across agents, and there is no reinsurance, correlation modelling or premium
-term structure yet — these are real actuarial gaps and are listed rather than hidden.
+Explicitly not done: Base Sepolia deployment is scripted and preflight-checks its own balance, but
+has not been run — the deployer address is unfunded. The reinsurance, correlation and term-structure
+loadings are structurally correct but **not calibrated**: they are reasoned defaults, because no
+loss history for agent breaches exists anywhere yet to fit them to.
