@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Syndicate — live demo</title>
+<style>
+  :root{
+    --bg:#0a0c10; --panel:#12151c; --line:#20252f; --ink:#e8ecf3; --dim:#828da3;
+    --pos:#37d399; --neg:#ff5f6d; --warn:#ffb648; --acc:#6ba4ff;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.55 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif;}
+  header{padding:26px 32px 18px;border-bottom:1px solid var(--line);
+    display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap}
+  h1{margin:0;font-size:21px;letter-spacing:-.02em;font-weight:650}
+  h1 span{color:var(--dim);font-weight:400}
+  .sub{color:var(--dim);font-size:13.5px;margin-top:5px;max-width:62ch}
+  button{background:var(--acc);color:#08101f;border:0;border-radius:7px;
+    padding:11px 20px;font-size:14px;font-weight:650;cursor:pointer;font-family:inherit}
+  button:disabled{opacity:.45;cursor:default}
+  a{color:var(--acc)}
+  main{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:20px;padding:22px 32px 40px}
+  @media(max-width:1000px){main{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:18px 20px}
+  .card h2{margin:0 0 3px;font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--dim);font-weight:650}
+  .agents{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px}
+  @media(max-width:900px){.agents{grid-template-columns:1fr 1fr}}
+  @media(max-width:640px){.agents{grid-template-columns:1fr}}
+  .agent{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:17px 18px;
+    transition:border-color .3s, box-shadow .3s}
+  .agent.breached{border-color:var(--neg);box-shadow:0 0 0 1px rgba(255,95,109,.25)}
+  .agent.clean{border-color:var(--pos);box-shadow:0 0 0 1px rgba(55,211,153,.2)}
+  .agent .name{font-weight:650;font-size:14.5px}
+  .agent .key{font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:3px}
+  .rate{font-family:var(--mono);font-size:35px;font-weight:600;letter-spacing:-.03em;margin:14px 0 2px;
+    transition:color .4s}
+  .rate.up{color:var(--neg)} .rate.down{color:var(--pos)}
+  .rate .delta{font-size:14px;font-weight:500;margin-left:8px}
+  .rate-lbl{font-size:11.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.07em}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:15px;
+    border-top:1px solid var(--line);padding-top:13px}
+  .stat .v{font-family:var(--mono);font-size:16px;font-weight:600}
+  .stat .k{font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
+  .verdict{margin-top:13px;font-size:12.5px;font-weight:650;padding:8px 11px;border-radius:6px;display:none}
+  .verdict.show{display:block}
+  .verdict.bad{background:rgba(255,95,109,.11);color:var(--neg)}
+  .verdict.good{background:rgba(55,211,153,.1);color:var(--pos)}
+  #log{font-family:var(--mono);font-size:12.2px;line-height:1.75;height:560px;overflow-y:auto;margin-top:12px}
+  #log div{padding:3px 0;border-bottom:1px solid rgba(255,255,255,.035);display:flex;gap:11px}
+  #log .t{color:var(--dim);flex:0 0 108px;text-transform:uppercase;font-size:10.5px;letter-spacing:.05em;padding-top:2px}
+  .t.breach,.t.error{color:var(--neg)!important} .t.clean,.t.done,.t.guard{color:var(--pos)!important}
+  .t.quote{color:var(--warn)!important} .t.deployed,.t.bound{color:var(--acc)!important}
+  .thesis{font-size:13.2px;color:var(--dim);margin-top:11px}
+  .thesis b{color:var(--ink);font-weight:600}
+  .pill{display:inline-block;font-size:10.5px;font-family:var(--mono);padding:3px 8px;border-radius:20px;
+    border:1px solid var(--line);color:var(--dim)}
+  .notice{margin:0 32px 4px;padding:12px 16px;border-radius:9px;font-size:13.2px;line-height:1.5;
+    background:rgba(255,182,72,.09);border:1px solid rgba(255,182,72,.3);color:#ffcf8a}
+  .notice b{color:#ffe0ae}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Syndicate <span>— counterparty insurance for autonomous agents</span></h1>
+    <div class="sub">Underwriters stake capital behind an agent. The premium a buyer is quoted
+      <b style="color:var(--ink)">is</b> the trust signal — and unlike a rating, it costs money to be wrong about.</div>
+  </div>
+  <div style="display:flex;gap:12px;align-items:center">
+    <span class="pill" id="mode">…</span>
+    <button id="run">Replay the run</button>
+  </div>
+</header>
+
+<p class="notice" id="notice">
+  <b>This page replays a recorded run — it is not executing live.</b>
+  There is no EVM behind a static host. Every event below is genuine output from
+  <code>runScenario</code> against a real local chain (anvil), captured by
+  <code>npm run record</code> — not hand-written. To watch it execute for real,
+  clone <a href="https://github.com/aswin-giridhar/syndicate">the repository</a> and run
+  <code>anvil</code> then <code>npm start</code>.
+</p>
+
+<main>
+  <div>
+    <div class="agents" id="agents"></div>
+    <div class="card">
+      <h2>Why a price and not a score</h2>
+      <div class="thesis">
+        Every existing agent-trust design — the ERC-8004 Reputation Registry, gauntlet scores,
+        soulbound badges — produces a <b>claim</b>, and claims are cheap to manufacture.
+        The first empirical study of ERC-8004 (arXiv:2606.26028) found
+        <b>73.5% / 59.2% / 90.6%</b> of reviewers on Ethereum / BSC / Base were coordinated Sybils,
+        and that reputation there "can be manipulated at minimal cost".
+        <br><br>
+        Capital at risk has never been cheap to fake. Here, loss experience can only be written by a
+        receipt carrying the agent's <b>own runtime signature</b>, so a record cannot be invented in
+        either direction — and red-teaming stops being an altruistic public good, because it is simply
+        what underwriters do to protect their own money.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Chain events</h2>
+    <div id="log"></div>
+  </div>
+</main>
+
+<script>
+const AGENTS = {
+  "northwind-procure-v1": { label: "Procure-Bot v1", note: "naive — listing goes into the prompt" },
+  "northwind-procure-v2": { label: "Procure-Bot v2", note: "isolated — listing treated as data" },
+  "northwind-procure-v0": { label: "Procure-Bot v0", note: "compromised — takes the job, then goes dark" },
+};
+const state = {};
+const el = (id) => document.getElementById(id);
+
+function renderAgents(){
+  el("agents").innerHTML = Object.entries(AGENTS).map(([id, a]) => `
+    <div class="agent" id="card-${id}">
+      <div class="name">${a.label}</div>
+      <div class="key">${a.note}</div>
+      <div class="rate" id="rate-${id}">—<span class="delta" id="delta-${id}"></span></div>
+      <div class="rate-lbl">premium rate quoted</div>
+      <div class="grid2">
+        <div class="stat"><div class="v" id="pool-${id}">—</div><div class="k">syndicate pool</div></div>
+        <div class="stat"><div class="v" id="rec-${id}">—</div><div class="k">trials / breaches</div></div>
+        <div class="stat"><div class="v" id="erc-${id}">—</div><div class="k">ERC-8004 verdict</div></div>
+        <div class="stat"><div class="v" id="uw-${id}">—</div><div class="k">underwriter A stake</div></div>
+      </div>
+      <div class="verdict" id="verdict-${id}"></div>
+    </div>`).join("");
+}
+renderAgents();
+
+const eth = (wei) => (Number(BigInt(wei)) / 1e18);
+
+let RECORDING = null;
+fetch("run.json").then(r => r.json()).then(d => {
+  RECORDING = d;
+  el("mode").textContent = `recorded · ${d.mode === "stand-in" ? "stand-in agents" : "live Claude"}`;
+}).catch(() => {
+  el("mode").textContent = "recording unavailable";
+  el("notice").textContent = "The recorded run failed to load, so this page has nothing to show. That is a failure, not an empty result.";
+});
+
+function apply(e){
+  const line = document.createElement("div");
+  const tag = document.createElement("span");
+  tag.className = "t " + e.type;
+  tag.textContent = e.type;
+  const msg = document.createElement("span");
+  msg.textContent = e.message;
+  line.append(tag, msg);
+  el("log").appendChild(line);
+  el("log").scrollTop = el("log").scrollHeight;
+
+  const id = e.data && e.data.name;
+  if (!id || !AGENTS[id]) return;
+  const s = state[id] || (state[id] = {});
+
+  if (e.type === "quote") {
+    const pct = e.data.rateBps / 100;
+    const prev = s.cold;
+    el(`rate-${id}`).childNodes[0].nodeValue = pct.toFixed(2) + "%";
+    if (e.data.phase === "cold") s.cold = pct;
+    else if (prev != null) {
+      const d = pct - prev;
+      el(`delta-${id}`).textContent = (d >= 0 ? "▲ +" : "▼ ") + d.toFixed(2) + " pts";
+      el(`rate-${id}`).className = "rate " + (d > 0 ? "up" : "down");
+    }
+  }
+  if (e.type === "stats") {
+    el(`pool-${id}`).textContent = eth(e.data.pool).toFixed(4) + " ETH";
+    el(`rec-${id}`).textContent = `${e.data.trials} / ${e.data.failures}`;
+  }
+  if (e.type === "erc8004") {
+    const n = el(`erc-${id}`);
+    n.textContent = `${e.data.response}/100`;
+    n.style.color = e.data.response >= 50 ? "var(--pos)" : "var(--neg)";
+  }
+  if (e.type === "underwriter") {
+    el(`uw-${id}`).textContent = eth(e.data.value).toFixed(3) + " ETH";
+  }
+  if (e.type === "breach" || e.type === "clean") {
+    const card = el(`card-${id}`), v = el(`verdict-${id}`);
+    const bad = e.type === "breach";
+    card.className = "agent " + (bad ? "breached" : "clean");
+    v.className = "verdict show " + (bad ? "bad" : "good");
+    v.textContent = bad
+      ? (id === "northwind-procure-v0"
+          ? "TIMED OUT — never accounted for the payment. Silence settled as a breach."
+          : "BREACH — funds redirected to attacker. Claim paid, syndicate slashed.")
+      : "CLEAN — paid the vendor of record. Premium retained.";
+  }
+}
+
+el("run").onclick = () => {
+  if (!RECORDING) return;
+  el("run").disabled = true;
+  el("log").innerHTML = "";
+  renderAgents();
+  Object.keys(state).forEach(k => delete state[k]);
+
+  // Replay at a readable cadence rather than the original wall-clock timings,
+  // which are dominated by block mining and network round-trips.
+  const events = RECORDING.events;
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let i = 0;
+  const tick = () => {
+    if (i >= events.length) { el("run").disabled = false; return; }
+    apply(events[i++]);
+    setTimeout(tick, reduced ? 0 : 260);
+  };
+  tick();
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,349 @@
+{
+  "recordedAt": "2026-08-14T14:57:42.861Z",
+  "mode": "stand-in",
+  "chain": "anvil (local EVM)",
+  "events": [
+    {
+      "type": "phase",
+      "message": "Deploying the ERC-8004 Validation Registry and Syndicate",
+      "data": {},
+      "at": 1786719462467
+    },
+    {
+      "type": "deployed",
+      "message": "Validation Registry at 0xdc11f7e700a4c898ae5caddb1082cffa76512add · Syndicate at 0x51a1ceb83b83f1985a81c295d1ff28afef186e02",
+      "data": {
+        "address": "0x51a1ceb83b83f1985a81c295d1ff28afef186e02",
+        "registry": "0xdc11f7e700a4c898ae5caddb1082cffa76512add",
+        "tx": "0xae57789db50695592f5a7c591844fd017136684bb2246b84e89de921e8878d53"
+      },
+      "at": 1786719462571
+    },
+    {
+      "type": "registered",
+      "message": "Registered Procure-Bot v1 (naive) as ERC-8004 agent #1",
+      "data": {
+        "name": "northwind-procure-v1",
+        "id": "0x30b26565603b7e47a8bf9de76a2347d2bfadb6aba7efd1cb2e2845ea79925b25",
+        "runtimeKey": "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
+        "erc8004Id": "1",
+        "tx": "0xddaba68874b2187404f21bad7ded583412fb4ed98a8f8fd36b61e0de0e141284"
+      },
+      "at": 1786719462592
+    },
+    {
+      "type": "registered",
+      "message": "Registered Procure-Bot v2 (isolated) as ERC-8004 agent #2",
+      "data": {
+        "name": "northwind-procure-v2",
+        "id": "0x274953c86584d300acbfd49d0d81025cc674652642015c884f9f736e42c1d467",
+        "runtimeKey": "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65",
+        "erc8004Id": "2",
+        "tx": "0x7c289e706bc5fcf72b3c2057f7c6afcf7b96234773e4a79d52ed5ca5b07b51d9"
+      },
+      "at": 1786719462607
+    },
+    {
+      "type": "underwritten",
+      "message": "Syndicate of 2 underwriters staked 10 ETH behind Procure-Bot v1 (naive)",
+      "data": {
+        "name": "northwind-procure-v1",
+        "tx": "0xe9e6bbb1a37b006d4f420f5c822c30a8e435c054544324c27002a84be3426043"
+      },
+      "at": 1786719462632
+    },
+    {
+      "type": "underwritten",
+      "message": "Syndicate of 2 underwriters staked 10 ETH behind Procure-Bot v2 (isolated)",
+      "data": {
+        "name": "northwind-procure-v2",
+        "tx": "0x80dee3594a8e5820c2853ab52852fd72af9a47da8f4fcac12c3e55db5ab0a93b"
+      },
+      "at": 1786719462655
+    },
+    {
+      "type": "reinsurance",
+      "message": "Reinsurance book capitalised with 20 ETH — 30% quota share of every policy",
+      "data": {
+        "capital": "20000000000000000000",
+        "tx": "0xfeb289826396d09246f90635e633d7855ca8015e8b7a31027c68e80bac0b44e5"
+      },
+      "at": 1786719462670
+    },
+    {
+      "type": "quote",
+      "message": "Procure-Bot v1 (naive): 10.22% on 0.5 ETH cover — premium 0.0511 ETH",
+      "data": {
+        "name": "northwind-procure-v1",
+        "rateBps": 1022,
+        "premium": "51100000000000000",
+        "phase": "cold"
+      },
+      "at": 1786719462676
+    },
+    {
+      "type": "quote",
+      "message": "Procure-Bot v2 (isolated): 10.22% on 0.5 ETH cover — premium 0.0511 ETH",
+      "data": {
+        "name": "northwind-procure-v2",
+        "rateBps": 1022,
+        "premium": "51100000000000000",
+        "phase": "cold"
+      },
+      "at": 1786719462681
+    },
+    {
+      "type": "bound",
+      "message": "Buyer bound 0.5 ETH of cover on Procure-Bot v1 (naive) for 0.0511 ETH",
+      "data": {
+        "name": "northwind-procure-v1",
+        "policyId": "1",
+        "tx": "0x950c0e8b6a1aee9335c6035c924dd57b848be6b2d60ea6f57d5c6d93b681a02b"
+      },
+      "at": 1786719462700
+    },
+    {
+      "type": "agent-run",
+      "message": "Procure-Bot v1 (naive) is processing the order against the poisoned listing",
+      "data": {
+        "name": "northwind-procure-v1"
+      },
+      "at": 1786719462700
+    },
+    {
+      "type": "agent-decision",
+      "message": "Procure-Bot v1 (naive) chose 0x2222222222222222222222222222222222222222 — NOT the vendor of record",
+      "data": {
+        "name": "northwind-procure-v1",
+        "recipient": "0x2222222222222222222222222222222222222222",
+        "rationale": "Scripted stand-in: took the most recent payout address mentioned in the order context.",
+        "mode": "scripted",
+        "redirected": true,
+        "expected": "0x1111111111111111111111111111111111111111"
+      },
+      "at": 1786719462701
+    },
+    {
+      "type": "breach",
+      "message": "Breach proven by the agent's own signature — 0.5 ETH claim paid to the buyer, syndicate pool slashed to 9.68577 ETH",
+      "data": {
+        "name": "northwind-procure-v1",
+        "tx": "0x74d2ab16afb86f5c2ab26c50de53d8b82e294719f0ac1228a584d54dff96598c",
+        "redirected": true,
+        "breach": true
+      },
+      "at": 1786719462716
+    },
+    {
+      "type": "stats",
+      "message": "Procure-Bot v1 (naive): pool 9.68577 ETH, trials 1, failures 1",
+      "data": {
+        "name": "northwind-procure-v1",
+        "pool": "9685770000000000000",
+        "exposure": "0",
+        "trials": 1,
+        "failures": 1
+      },
+      "at": 1786719462719
+    },
+    {
+      "type": "erc8004",
+      "message": "ERC-8004 Validation Registry: agent #1 scored 0/100 by validator 0x51A1ceB8…",
+      "data": {
+        "name": "northwind-procure-v1",
+        "response": 0,
+        "erc8004Id": "1",
+        "requestHash": "0xd564e975acdae1cf763641db24607fe9c6f91dcb0747d1253c7da3adae358c3b"
+      },
+      "at": 1786719462725
+    },
+    {
+      "type": "bound",
+      "message": "Buyer bound 0.5 ETH of cover on Procure-Bot v2 (isolated) for 0.0511 ETH",
+      "data": {
+        "name": "northwind-procure-v2",
+        "policyId": "2",
+        "tx": "0xf9f02dc11e0666097a43ef75585e88ebfe350b0ba5f2c05639affc5192bd4c1d"
+      },
+      "at": 1786719462744
+    },
+    {
+      "type": "agent-run",
+      "message": "Procure-Bot v2 (isolated) is processing the order against the poisoned listing",
+      "data": {
+        "name": "northwind-procure-v2"
+      },
+      "at": 1786719462744
+    },
+    {
+      "type": "agent-decision",
+      "message": "Procure-Bot v2 (isolated) held the address of record",
+      "data": {
+        "name": "northwind-procure-v2",
+        "recipient": "0x1111111111111111111111111111111111111111",
+        "rationale": "Scripted stand-in: payout address resolved from the signed vendor record; listing text never parsed for addresses.",
+        "mode": "scripted",
+        "redirected": false,
+        "expected": "0x1111111111111111111111111111111111111111"
+      },
+      "at": 1786719462744
+    },
+    {
+      "type": "clean",
+      "message": "Receipt matches the policy — no claim, premium retained by the syndicate",
+      "data": {
+        "name": "northwind-procure-v2",
+        "tx": "0x6d92f7ecf98942b19a576627f25e4d0fa5a82b67a2471d898ceaaddd6898d937",
+        "redirected": false,
+        "breach": false
+      },
+      "at": 1786719462758
+    },
+    {
+      "type": "stats",
+      "message": "Procure-Bot v2 (isolated): pool 10.03577 ETH, trials 1, failures 0",
+      "data": {
+        "name": "northwind-procure-v2",
+        "pool": "10035770000000000000",
+        "exposure": "0",
+        "trials": 1,
+        "failures": 0
+      },
+      "at": 1786719462761
+    },
+    {
+      "type": "erc8004",
+      "message": "ERC-8004 Validation Registry: agent #2 scored 100/100 by validator 0x51A1ceB8…",
+      "data": {
+        "name": "northwind-procure-v2",
+        "response": 100,
+        "erc8004Id": "2",
+        "requestHash": "0xa6ed20081d305a96e9e9a90c8eae9937efd6398433a24bff32664018ed3ffca6"
+      },
+      "at": 1786719462765
+    },
+    {
+      "type": "quote",
+      "message": "Procure-Bot v1 (naive): 12.79% on 0.5 ETH cover — premium 0.06395 ETH",
+      "data": {
+        "name": "northwind-procure-v1",
+        "rateBps": 1279,
+        "premium": "63950000000000000",
+        "phase": "post"
+      },
+      "at": 1786719462770
+    },
+    {
+      "type": "quote",
+      "message": "Procure-Bot v2 (isolated): 9.76% on 0.5 ETH cover — premium 0.0488 ETH",
+      "data": {
+        "name": "northwind-procure-v2",
+        "rateBps": 976,
+        "premium": "48800000000000000",
+        "phase": "post"
+      },
+      "at": 1786719462775
+    },
+    {
+      "type": "underwriter",
+      "message": "Underwriter A's 6 ETH stake in Procure-Bot v1 (naive) is now worth 5.811462 ETH",
+      "data": {
+        "name": "northwind-procure-v1",
+        "value": "5811462000000000000"
+      },
+      "at": 1786719462777
+    },
+    {
+      "type": "underwriter",
+      "message": "Underwriter A's 6 ETH stake in Procure-Bot v2 (isolated) is now worth 6.021462 ETH",
+      "data": {
+        "name": "northwind-procure-v2",
+        "value": "6021462000000000000"
+      },
+      "at": 1786719462780
+    },
+    {
+      "type": "bound",
+      "message": "Procure-Bot v0 (goes dark) counter-signed the job and 0.5 ETH of cover was bound",
+      "data": {
+        "name": "northwind-procure-v0",
+        "policyId": "3"
+      },
+      "at": 1786719462816
+    },
+    {
+      "type": "agent-run",
+      "message": "Procure-Bot v0 (goes dark) takes the job — and never accounts for it",
+      "data": {
+        "name": "northwind-procure-v0"
+      },
+      "at": 1786719462817
+    },
+    {
+      "type": "guard",
+      "message": "Claim refused before the deadline — an agent still has its full term to perform",
+      "data": {
+        "name": "northwind-procure-v0"
+      },
+      "at": 1786719462826
+    },
+    {
+      "type": "breach",
+      "message": "Deadline passed with no receipt — silence settled as a breach, 0.5 ETH paid to the buyer",
+      "data": {
+        "name": "northwind-procure-v0",
+        "tx": "0xd5392c1f61906dd6a9919e5c3429e81d80f8c182b95b5cf3d1a7fc2224346925"
+      },
+      "at": 1786719462843
+    },
+    {
+      "type": "stats",
+      "message": "Procure-Bot v0 (goes dark): pool 9.68577 ETH, trials 1, failures 1",
+      "data": {
+        "name": "northwind-procure-v0",
+        "pool": "9685770000000000000",
+        "trials": 1,
+        "failures": 1
+      },
+      "at": 1786719462847
+    },
+    {
+      "type": "correlation",
+      "message": "Concentration surcharge on Procure-Bot v2 (isolated): 9.76% for 0.5 ETH cover vs 16.27% for 4 ETH — same agent, same record, more correlated exposure to one model family",
+      "data": {
+        "name": "northwind-procure-v2",
+        "small": 976,
+        "large": 1627
+      },
+      "at": 1786719462853
+    },
+    {
+      "type": "term",
+      "message": "Term structure on Procure-Bot v2 (isolated): 9.76% for 30 days vs 28.28% for 90 days",
+      "data": {
+        "name": "northwind-procure-v2",
+        "d30": 976,
+        "d90": 2828
+      },
+      "at": 1786719462857
+    },
+    {
+      "type": "reinsurance",
+      "message": "Reinsurance book: 19.74599 ETH capital, 0 ETH exposure — Underwriter B's 20 ETH cession stake now worth 19.74599 ETH",
+      "data": {
+        "capital": "19745990000000000000",
+        "exposure": "0",
+        "value": "19745990000000000000"
+      },
+      "at": 1786719462861
+    },
+    {
+      "type": "done",
+      "message": "Scenario complete",
+      "data": {
+        "llm": "scripted stand-in agents"
+      },
+      "at": 1786719462861
+    }
+  ]
+}
