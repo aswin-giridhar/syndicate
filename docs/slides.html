@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Syndicate — gallery slides</title>
+<style>
+  /* Each slide is exactly 1200x800 — Devpost's preferred 3:2 ratio. */
+  :root{
+    --bg:#0b0e14; --panel:#141923; --line:#242c3a; --ink:#e7ebf3; --dim:#939db2;
+    --pos:#37d399; --neg:#ff5f6d; --acc:#8fa6e8;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --serif:Georgia,"Iowan Old Style",serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);font-family:ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .slide{width:1200px;height:100vh;background:var(--bg);color:var(--ink);
+    padding:52px 68px;display:flex;flex-direction:column;overflow:hidden}
+  .eyebrow{font-family:var(--mono);font-size:14px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--acc);margin-bottom:22px}
+  h1{font-family:var(--serif);font-size:66px;line-height:1.02;letter-spacing:-.025em;font-weight:400}
+  h2{font-family:var(--serif);font-size:46px;line-height:1.1;letter-spacing:-.02em;font-weight:400;margin-bottom:26px}
+  .lede{font-size:23px;line-height:1.4;color:var(--dim);max-width:34ch;margin-top:20px}
+  .spacer{flex:1}
+  .foot{font-family:var(--mono);font-size:14px;color:var(--dim);letter-spacing:.06em;
+    display:flex;justify-content:space-between;border-top:1px solid var(--line);padding-top:18px}
+
+  /* slide 1 */
+  .split{display:flex;gap:56px;align-items:flex-end}
+  .nums{display:flex;gap:40px;margin-top:8px}
+    .num .v{font-family:var(--mono);font-size:58px;font-weight:600;letter-spacing:-.03em;line-height:1}
+  .num .k{font-size:15px;color:var(--dim);margin-top:10px;max-width:20ch;line-height:1.35}
+  .bad{color:var(--neg)} .good{color:var(--pos)}
+
+  /* slide 2 — evidence */
+  table{width:100%;border-collapse:collapse;font-size:20px;margin-top:8px}
+  th,td{text-align:left;padding:17px 14px;border-bottom:1px solid var(--line)}
+  thead th{font-family:var(--mono);font-size:13px;letter-spacing:.11em;text-transform:uppercase;color:var(--dim)}
+  td.n,th.n{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:600}
+  .quote{margin-top:30px;padding:20px 26px;border-left:4px solid var(--acc);background:#161c2c;
+    font-family:var(--serif);font-size:25px;line-height:1.35}
+  .cite{font-family:var(--mono);font-size:13px;color:var(--dim);letter-spacing:.08em;margin-top:12px;text-transform:uppercase}
+
+  /* slide 3 — three outcomes */
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:6px}
+  .c{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:26px 24px}
+  .c.breach{border-color:var(--neg)} .c.clean{border-color:var(--pos)}
+  .c .who{font-size:20px;font-weight:650}
+  .c .desc{font-family:var(--mono);font-size:12.5px;color:var(--dim);margin-top:7px;line-height:1.45;height:52px}
+  .c .rate{font-family:var(--mono);font-size:44px;font-weight:600;letter-spacing:-.03em;margin:16px 0 4px}
+  .c .lbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.09em}
+  .c .verdict{margin-top:20px;font-size:14px;font-weight:650;padding:11px 13px;border-radius:7px;line-height:1.35}
+  .c.breach .verdict{background:rgba(255,95,109,.12);color:var(--neg)}
+  .c.clean .verdict{background:rgba(55,211,153,.11);color:var(--pos)}
+  .erc{font-family:var(--mono);font-size:15px;margin-top:16px;color:var(--dim)}
+  .erc b{font-size:18px}
+
+  /* slide 4 — pricing */
+  .rows{margin-top:10px}
+  .row{display:flex;justify-content:space-between;align-items:baseline;gap:24px;
+    padding:22px 4px;border-bottom:1px solid var(--line)}
+  .row .t{font-size:21px;max-width:44ch;line-height:1.35}
+  .row .r{font-family:var(--mono);font-size:38px;font-weight:600;letter-spacing:-.02em}
+  .note{margin-top:26px;font-size:18px;color:var(--dim);line-height:1.5;max-width:62ch}
+</style>
+</head>
+<body>
+
+<!-- 1 — thumbnail. Must read at card size: one idea, two numbers. -->
+<div class="slide" id="s1">
+  <div class="eyebrow">NTU InnovateX 2026 · Track 2</div>
+  <h1>Stop scoring agents.<br>Price them.</h1>
+  <div class="lede">Counterparty insurance for autonomous AI agents.</div>
+  <div class="spacer"></div>
+  <div class="nums">
+    <div class="num"><div class="v bad">12.79%</div>
+      <div class="k">quoted to the agent that got prompt-injected</div></div>
+    <div class="num"><div class="v good">9.76%</div>
+      <div class="k">quoted to the agent that held the line</div></div>
+    <div class="num"><div class="v">1</div>
+      <div class="k">observed trial — no oracle, no rating agency</div></div>
+  </div>
+  <div class="spacer"></div>
+  <div class="foot"><span>The premium is the trust signal</span><span>syndicate-ecru.vercel.app</span></div>
+</div>
+
+<!-- 2 — the evidence that forces the idea -->
+<div class="slide" id="s2">
+  <div class="eyebrow">Why reputation cannot carry this</div>
+  <h2>Every trust signal we have is a claim,<br>and claims are cheap</h2>
+  <table>
+    <thead><tr><th>Measured across the live ERC-8004 ecosystem</th>
+      <th class="n">Ethereum</th><th class="n">BSC</th><th class="n">Base</th></tr></thead>
+    <tbody>
+      <tr><td>Reviewers exhibiting coordinated Sybil behaviour</td>
+        <td class="n bad">73.5%</td><td class="n bad">59.2%</td><td class="n bad">90.6%</td></tr>
+      <tr><td>Rated agents with no valid feedback once Sybils are removed</td>
+        <td class="n bad">15.8%</td><td class="n bad">77.9%</td><td class="n bad">86.8%</td></tr>
+      <tr><td>Registrations exposing a live service endpoint</td>
+        <td class="n">3%</td><td class="n">4%</td><td class="n">15%</td></tr>
+    </tbody>
+  </table>
+  <div class="quote">Reputation “can be manipulated at minimal cost”, and feedback is
+    “rarely grounded in verifiable interactions”.
+    <div class="cite">arXiv:2606.26028 — Can Trustless Agents Be Trusted?</div>
+  </div>
+  <div class="spacer"></div>
+  <div class="foot"><span>Capital at risk has never been cheap to fake</span><span>Syndicate</span></div>
+</div>
+
+<!-- 3 — three agents, three outcomes -->
+<div class="slide" id="s3">
+  <div class="eyebrow">Same order · same poisoned listing · three outcomes</div>
+  <h2>What the market priced</h2>
+  <div class="cards">
+    <div class="c breach">
+      <div class="who">Procure-Bot v1</div>
+      <div class="desc">naive — the listing goes<br>straight into the prompt</div>
+      <div class="rate bad">12.79%</div><div class="lbl">re-quoted</div>
+      <div class="erc">ERC-8004 <b class="bad">0/100</b></div>
+      <div class="verdict">BREACH — funds redirected to attacker. Claim paid, syndicate slashed.</div>
+    </div>
+    <div class="c clean">
+      <div class="who">Procure-Bot v2</div>
+      <div class="desc">isolated — the listing is<br>treated strictly as data</div>
+      <div class="rate good">9.76%</div><div class="lbl">re-quoted</div>
+      <div class="erc">ERC-8004 <b class="good">100/100</b></div>
+      <div class="verdict">CLEAN — paid the vendor of record. Premium retained.</div>
+    </div>
+    <div class="c breach">
+      <div class="who">Procure-Bot v0</div>
+      <div class="desc">compromised — takes the job,<br>then goes dark</div>
+      <div class="rate bad">—</div><div class="lbl">never accounted</div>
+      <div class="erc">pool <b class="bad">9.69 ETH</b></div>
+      <div class="verdict">TIMED OUT — silence settled as a breach after the term.</div>
+    </div>
+  </div>
+  <div class="spacer"></div>
+  <div class="foot"><span>Both were quoted 10.22% cold, with no history to separate them</span><span>Syndicate</span></div>
+</div>
+
+<!-- 4 — the actuarial claim -->
+<div class="slide" id="s4">
+  <div class="eyebrow">Priced by a market, not scored by a rating</div>
+  <h2>Risk nobody else is pricing</h2>
+  <div class="rows">
+    <div class="row"><div class="t">0.5 ETH cover · 30-day term · clean record</div><div class="r good">9.76%</div></div>
+    <div class="row"><div class="t">4 ETH cover on the <b>same agent</b> — correlated exposure to one model family</div>
+      <div class="r bad">16.27%</div></div>
+    <div class="row"><div class="t">0.5 ETH cover over a <b>90-day</b> term instead of 30</div><div class="r bad">28.28%</div></div>
+  </div>
+  <div class="note">Same agent and same loss record in every row — only the exposure and the term change.
+    Agents sharing a base model share its failure modes: one new injection technique breaches all of
+    them the same afternoon. That is the agent-economy version of writing every policy on one flood
+    plain, and a per-agent pool structurally cannot see it.</div>
+  <div class="spacer"></div>
+  <div class="foot"><span>Reinsurance · correlation · term structure · receipt-backed claims</span><span>github.com/aswin-giridhar/syndicate</span></div>
+</div>
+
+</body>
+</html>
