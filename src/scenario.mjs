@@ -8,8 +8,8 @@ import { parseEventLogs } from "viem";
 import {
   deploy, contract, agentId, accounts, signReceipt, ABI,
   parseEther, VENDOR,
-} from "./chain.mjs";
-import { AGENTS, POISONED_LISTING, LLM_AVAILABLE } from "./agents.mjs";
+} from "./chain/client.mjs";
+import { AGENTS, POISONED_LISTING, LLM_AVAILABLE } from "./agents/agents.mjs";
 
 const fmt = (wei) => `${Number(wei) / 1e18} ETH`;
 const bps = (n) => `${(Number(n) / 100).toFixed(2)}%`;

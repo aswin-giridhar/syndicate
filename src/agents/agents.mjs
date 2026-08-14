@@ -11,12 +11,12 @@
 // address from the signed vendor record instead.
 
 import { readFileSync, existsSync } from "node:fs";
-import { VENDOR, ATTACKER } from "./chain.mjs";
+import { VENDOR, ATTACKER } from "../chain/client.mjs";
 
 // --------------------------------------------------------------- LLM provider
 
 function loadEnv() {
-  const path = new URL("../.env", import.meta.url);
+  const path = new URL("../../.env", import.meta.url);
   if (!existsSync(path)) return;
   for (const line of readFileSync(path, "utf8").split("\n")) {
     const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);

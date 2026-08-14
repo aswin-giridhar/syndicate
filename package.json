@@ -4,10 +4,11 @@
   "description": "Counterparty insurance for autonomous AI agents. The premium is the trust signal.",
   "main": "index.js",
   "scripts": {
-    "demo": "forge build && node scripts/demo.mjs",
-    "start": "forge build && node app/server.mjs",
+    "demo": "forge build && node script/demo.mjs",
+    "start": "forge build && node src/server/server.mjs",
     "chain": "anvil",
-    "build": "forge build"
+    "build": "forge build",
+    "deploy": "forge build && node script/deploy-base-sepolia.mjs"
   },
   "keywords": [],
   "author": "",

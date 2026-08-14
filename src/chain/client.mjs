@@ -11,7 +11,7 @@ import { foundry } from "viem/chains";
 
 const RPC = process.env.RPC_URL ?? "http://127.0.0.1:8545";
 
-const artifact = JSON.parse(readFileSync(new URL("../out/Syndicate.sol/Syndicate.json", import.meta.url)));
+const artifact = JSON.parse(readFileSync(new URL("../../out/Syndicate.sol/Syndicate.json", import.meta.url)));
 export const ABI = artifact.abi;
 const BYTECODE = artifact.bytecode.object;
 

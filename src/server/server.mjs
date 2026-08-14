@@ -3,10 +3,10 @@
 
 import { createServer } from "node:http";
 import { readFileSync } from "node:fs";
-import { runScenario, LLM_AVAILABLE } from "./scenario.mjs";
+import { runScenario, LLM_AVAILABLE } from "../scenario.mjs";
 
 const PORT = process.env.PORT ?? 4173;
-const page = new URL("../public/index.html", import.meta.url);
+const page = new URL("../../public/index.html", import.meta.url);
 
 createServer(async (req, res) => {
   if (req.url === "/" || req.url?.startsWith("/index.html")) {

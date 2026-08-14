@@ -1,4 +1,4 @@
-import { runScenario, LLM_AVAILABLE } from "../app/scenario.mjs";
+import { runScenario, LLM_AVAILABLE } from "../src/scenario.mjs";
 
 const COLOR = {
   phase: "\x1b[1;36m", deployed: "\x1b[36m", registered: "\x1b[90m",
