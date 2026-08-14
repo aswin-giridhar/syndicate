@@ -107,6 +107,9 @@ blockquote cite{display:block;font-family:var(--mono);font-size:11px;font-style:
 figure{margin:26px 0}
 svg{display:block;width:100%;height:auto}
 .diagram{background:var(--panel);border:1px solid var(--rule);border-radius:3px;padding:22px 18px}
+/* Set via CSS rather than presentation attributes — a var() in a `fill="…"`
+   attribute is not reliably resolved, and these two colours carry the meaning. */
+.diagram .ok{fill:var(--clean)} .diagram .no{fill:var(--loss)}
 
 .status{background:var(--panel);border:1px solid var(--rule);border-radius:3px;padding:6px 22px 18px}
 .status dl{margin:0}
@@ -231,11 +234,10 @@ img.shot{width:100%;border:1px solid var(--rule);border-radius:3px;display:block
         </g>
       </g>
       <g font-family="ui-monospace,Menlo,monospace" font-size="11.5">
-        <rect x="570" y="14" width="240" height="58" rx="2" fill="none"/>
-        <text x="590" y="36" font-weight="600" fill="var(--clean)">recipient = policy</text>
-        <text x="590" y="55" fill="var(--clean)" opacity=".85">premium retained · trials +1</text>
-        <text x="590" y="156" font-weight="600" fill="var(--loss)">recipient ≠ policy</text>
-        <text x="590" y="175" fill="var(--loss)" opacity=".85">claim paid · pool slashed · failures +1</text>
+        <text class="ok" x="590" y="36" font-weight="600">recipient = policy</text>
+        <text class="ok" x="590" y="55" opacity=".85">premium retained · trials +1</text>
+        <text class="no" x="590" y="156" font-weight="600">recipient ≠ policy</text>
+        <text class="no" x="590" y="175" opacity=".85">claim paid · pool slashed · failures +1</text>
       </g>
       <text x="8" y="222" font-family="ui-monospace,Menlo,monospace" font-size="10.5" fill="currentColor" opacity=".55">
         The receipt is the only thing that ever writes loss experience — and it must carry the agent's own signature.</text>
@@ -298,8 +300,10 @@ img.shot{width:100%;border:1px solid var(--rule);border-radius:3px;display:block
         — nothing here implies it has happened.</dd>
       <dt>Labelled, not hidden</dt>
       <dd>The agents run against live Claude when an API key is present, and otherwise fall back
-        to deterministic stand-ins that say so in both the UI and the CLI. The stand-in for the
-        naive agent reproduces the same defect rather than hardcoding a failure.</dd>
+        to deterministic stand-ins that say so in both the UI and the CLI. The stand-in shares the
+        same <em>class</em> of defect — no boundary between trusted and untrusted context — but it
+        is a last-address-wins rule, not a model being reasoned out of its instructions. The
+        live-LLM run is the real demonstration of the attack.</dd>
       <dt>Known gaps</dt>
       <dd>Underwriter capital is unpooled across agents; there is no reinsurance, correlation
         modelling, or premium term structure yet. These are real actuarial gaps.</dd>

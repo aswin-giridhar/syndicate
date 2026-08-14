@@ -4,8 +4,8 @@
   "description": "Counterparty insurance for autonomous AI agents. The premium is the trust signal.",
   "main": "index.js",
   "scripts": {
-    "demo": "node scripts/demo.mjs",
-    "start": "node app/server.mjs",
+    "demo": "forge build && node scripts/demo.mjs",
+    "start": "forge build && node app/server.mjs",
     "chain": "anvil",
     "build": "forge build"
   },

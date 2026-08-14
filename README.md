@@ -67,12 +67,17 @@ their own capital is on the line.
 Everything below executes against a real EVM — real deployment, real ECDSA recovery, real
 reverts, real transaction hashes. Nothing is mocked.
 
+Requires Node 22+ and [Foundry](https://getfoundry.sh) (`forge`, `anvil`) on your PATH.
+
 ```
 npm install
-anvil                    # terminal 1 — local EVM
+npm run build            # forge build — compiles the contract artifact the app loads
+anvil                    # terminal 1 — local EVM on 127.0.0.1:8545
 npm run demo             # terminal 2 — end-to-end scenario in the console
 npm start                # or: dashboard at http://localhost:4173
 ```
+
+`npm run demo` and `npm start` both run `forge build` first, so a clean clone works either way.
 
 ### The scenario
 
@@ -129,8 +134,10 @@ nonce-guarded and bound to the chain id and contract address, so they cannot be 
   not done, and nothing here implies it is.
 - The two agents run against **live Claude** when an `ANTHROPIC_API_KEY` is present in `.env`,
   and otherwise fall back to **deterministic stand-ins that are labelled as such in the UI and
-  the CLI**. The stand-in for the naive agent reproduces the same defect (it accepts a payout
-  address appearing anywhere in its context); it is not a hardcoded failure.
+  the CLI**. The stand-in exhibits the same *class* of defect — it does not distinguish trusted
+  from untrusted regions of its context — but it is a last-address-wins rule, not a model being
+  reasoned out of its instructions. **The live-LLM run is the real demonstration of the attack;
+  the stand-in exists so the chain-side flow stays runnable without an API key.**
 - Underwriter capital is currently unpooled across agents and there is no reinsurance,
   correlation modelling, or premium term structure. Those are real actuarial gaps, listed here
   rather than hidden.
