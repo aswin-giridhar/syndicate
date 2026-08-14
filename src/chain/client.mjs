@@ -11,9 +11,15 @@ import { foundry } from "viem/chains";
 
 const RPC = process.env.RPC_URL ?? "http://127.0.0.1:8545";
 
-const artifact = JSON.parse(readFileSync(new URL("../../out/Syndicate.sol/Syndicate.json", import.meta.url)));
+const load = (p) => JSON.parse(readFileSync(new URL(`../../out/${p}`, import.meta.url)));
+
+const artifact = load("Syndicate.sol/Syndicate.json");
 export const ABI = artifact.abi;
 const BYTECODE = artifact.bytecode.object;
+
+const registryArtifact = load("ValidationRegistry.sol/ValidationRegistry.json");
+export const REGISTRY_ABI = registryArtifact.abi;
+const REGISTRY_BYTECODE = registryArtifact.bytecode.object;
 
 // anvil's deterministic accounts. Deterministic keys keep the demo reproducible;
 // these are the publicly published test keys and hold no real value.
@@ -42,11 +48,42 @@ export function walletFor(name) {
 
 export const agentId = (name) => keccak256(toHex(name));
 
-export async function deploy() {
+/// Deploys an ERC-8004 Validation Registry, then Syndicate pointed at it, so the
+/// standard's call path is genuinely exercised locally rather than assumed.
+/// On a live network, pass the canonical registry address instead.
+export async function deploy({ registryAddress } = {}) {
   const wallet = walletFor("deployer");
-  const hash = await wallet.deployContract({ abi: ABI, bytecode: BYTECODE, args: [] });
+
+  let registry = registryAddress;
+  let registryTx;
+  if (!registry) {
+    const rHash = await wallet.deployContract({
+      abi: REGISTRY_ABI,
+      bytecode: REGISTRY_BYTECODE,
+      args: ["0x0000000000000000000000000000000000000000"],
+    });
+    const rReceipt = await publicClient.waitForTransactionReceipt({ hash: rHash });
+    registry = rReceipt.contractAddress;
+    registryTx = rHash;
+  }
+
+  const hash = await wallet.deployContract({ abi: ABI, bytecode: BYTECODE, args: [registry] });
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
-  return { address: receipt.contractAddress, deployTx: hash, blockNumber: receipt.blockNumber };
+  return {
+    address: receipt.contractAddress,
+    deployTx: hash,
+    registry,
+    registryTx,
+    blockNumber: receipt.blockNumber,
+  };
+}
+
+export function registryContract(address) {
+  return {
+    address,
+    read: (functionName, args = []) =>
+      publicClient.readContract({ address, abi: REGISTRY_ABI, functionName, args }),
+  };
 }
 
 export function contract(address) {

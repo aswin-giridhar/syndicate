@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {IValidationRegistry} from "./IValidationRegistry.sol";
+
 /// @title Syndicate — counterparty insurance for autonomous AI agents.
 /// @notice Existing agent-trust designs (ERC-8004 Reputation Registry, gauntlet
 ///         scores, soulbound badges) all produce *claims*, which are cheap to
@@ -8,22 +10,21 @@ pragma solidity ^0.8.24;
 ///         Ethereum/BSC/Base are coordinated Sybils (arXiv:2606.26028).
 ///
 ///         Syndicate replaces the claim with a price. Underwriters stake capital
-///         behind a specific agent. A buyer about to transact with that agent binds
-///         a policy; the quoted premium is the market's live assessment of the
-///         agent's counterparty risk. If the agent breaches, the policy pays the
-///         buyer and the loss falls on the underwriters' shares.
+///         behind a specific agent; a buyer binds cover on a single payment; the
+///         quoted premium is the market's live assessment of that agent's
+///         counterparty risk. A breach pays the buyer and the loss falls on the
+///         underwriters.
 ///
 ///         Two properties follow that no reputation registry has:
 ///
 ///         1. Reputation cannot be forged. Loss experience is only ever written by
 ///            `submitReceipt`, which requires an ECDSA signature from the agent's
-///            own runtime key over the executed payment. An agent cannot invent a
-///            clean record it did not earn, and no third party can invent a dirty
-///            one on its behalf.
-///         2. Manipulation costs money. Inflating an agent's record means funding
-///            real premiums; attacking it means an underwriter absorbing real
-///            losses. The Sybil attack that is free against a star rating is
-///            capital-intensive here.
+///            own runtime key over the executed payment.
+///         2. Manipulation costs money. Inflating a record means funding real
+///            premiums; attacking one means an underwriter absorbing real losses.
+///
+///         Verdicts are written through to the ERC-8004 Validation Registry, so
+///         Syndicate extends the standard it critiques instead of sitting beside it.
 contract Syndicate {
     // ---------------------------------------------------------------- constants
 
@@ -34,20 +35,35 @@ contract Syndicate {
 
     /// @notice Loading applied to agents with no observed history. Unproven is
     ///         expensive, not cheap — the inverse of a reputation registry, where
-    ///         a fresh registration is indistinguishable from a trusted one. Only
-    ///         3%/4%/15% of ERC-8004 registrations even expose a live endpoint.
+    ///         a fresh registration is indistinguishable from a trusted one.
     uint256 public constant UNPROVEN_LOAD_BPS = 900;
 
-    /// @notice Trials required before loss experience is fully credible. Below
-    ///         this, the quote blends observed experience with the unproven
-    ///         loading rather than over-fitting to a handful of samples.
+    /// @notice Trials required before loss experience is fully credible.
     uint256 public constant CREDIBILITY_TRIALS = 20;
 
     /// @notice Weight on observed failure ratio once fully credible.
     uint256 public constant FAILURE_LOAD_BPS = 6_000;
 
-    /// @notice Weight on capacity utilisation — a pool near its limit prices up.
+    /// @notice Weight on the agent pool's capacity utilisation.
     uint256 public constant UTILISATION_LOAD_BPS = 2_000;
+
+    /// @notice Weight on correlated exposure to a single model family. See
+    ///         `_concentrationLoad` for why this is the systemic term.
+    uint256 public constant CONCENTRATION_LOAD_BPS = 4_000;
+
+    /// @notice Quota-share treaty: the reinsurance book takes this share of every
+    ///         policy's cover and premium, and carries the same share of any loss.
+    uint256 public constant CESSION_BPS = 3_000;
+
+    /// @notice Reference policy term. Rates are quoted for this term and scaled.
+    uint256 public constant BASE_TERM_DAYS = 30;
+
+    /// @notice Verdicts written to ERC-8004 for a settlement with no breach.
+    uint8 public constant RESPONSE_CLEAN = 100;
+    /// @notice Verdict written for a proven breach.
+    uint8 public constant RESPONSE_BREACH = 0;
+
+    string public constant VALIDATION_TAG = "syndicate.settlement";
 
     // ------------------------------------------------------------------- types
 
@@ -55,13 +71,18 @@ contract Syndicate {
         /// Key the agent's runtime signs execution receipts with. Set once at
         /// registration; the agent cannot rotate it to escape its own history.
         address runtimeKey;
+        /// Identity in the ERC-8004 Identity Registry, so verdicts written here
+        /// are attributable to the same agent other protocols already know.
+        uint256 erc8004Id;
+        /// The base model or framework this agent runs on. Agents sharing a
+        /// family fail together, which is what makes their risk correlated.
+        bytes32 modelFamily;
         string endpoint;
-        /// Underwriter capital backing this agent, in wei.
+        /// Underwriter capital dedicated to this agent — the junior tranche,
+        /// which absorbs its retained share of every loss first.
         uint256 pool;
-        /// Total shares issued against `pool`. Losses shrink `pool` and leave
-        /// shares untouched, so every underwriter is slashed pro-rata.
         uint256 shares;
-        /// Cover bound and not yet resolved.
+        /// Retained cover outstanding (net of cession to the book).
         uint256 exposure;
         uint64 trials;
         uint64 failures;
@@ -76,6 +97,9 @@ contract Syndicate {
         address expectedRecipient;
         uint256 cover;
         uint256 premium;
+        /// Portion of `cover` ceded to the reinsurance book.
+        uint256 ceded;
+        uint32 termDays;
         bool resolved;
     }
 
@@ -84,28 +108,47 @@ contract Syndicate {
     mapping(bytes32 => Agent) public agents;
     mapping(bytes32 => mapping(address => uint256)) public sharesOf;
     mapping(uint256 => Policy) public policies;
-    /// Receipt nonces already consumed, per agent — blocks replay of a receipt.
     mapping(bytes32 => mapping(uint256 => bool)) public usedNonce;
+
+    /// Cover outstanding per model family, across every agent. This is the
+    /// quantity a per-agent pool structurally cannot see.
+    mapping(bytes32 => uint256) public familyExposure;
+
+    // --- Reinsurance book: shared, cross-agent, senior to every agent pool. ---
+
+    uint256 public bookCapital;
+    uint256 public bookShares;
+    uint256 public bookExposure;
+    mapping(address => uint256) public bookSharesOf;
+
+    IValidationRegistry public immutable validationRegistry;
 
     uint256 public nextPolicyId = 1;
 
     // ------------------------------------------------------------------- events
 
-    event AgentRegistered(bytes32 indexed agentId, address runtimeKey, string endpoint);
+    event AgentRegistered(
+        bytes32 indexed agentId, uint256 indexed erc8004Id, address runtimeKey, bytes32 modelFamily, string endpoint
+    );
     event Underwritten(bytes32 indexed agentId, address indexed underwriter, uint256 amount, uint256 shares);
     event Withdrawn(bytes32 indexed agentId, address indexed underwriter, uint256 shares, uint256 amount);
+    event ReinsuranceDeposited(address indexed underwriter, uint256 amount, uint256 shares);
+    event ReinsuranceWithdrawn(address indexed underwriter, uint256 shares, uint256 amount);
     event PolicyBound(
         uint256 indexed policyId,
         bytes32 indexed agentId,
         address indexed beneficiary,
         uint256 cover,
         uint256 premium,
-        uint256 rateBps
+        uint256 rateBps,
+        uint256 ceded
     );
     event ReceiptAccepted(uint256 indexed policyId, bytes32 indexed agentId, address actualRecipient, uint256 amount);
     event Breach(uint256 indexed policyId, bytes32 indexed agentId, address expectedRecipient, address actualRecipient);
     event ClaimPaid(uint256 indexed policyId, bytes32 indexed agentId, address indexed beneficiary, uint256 amount);
     event PoolSlashed(bytes32 indexed agentId, uint256 amount, uint256 poolAfter);
+    event BookSlashed(bytes32 indexed agentId, uint256 amount, uint256 bookAfter);
+    event ValidationWritten(bytes32 indexed agentId, uint256 indexed erc8004Id, bytes32 requestHash, uint8 response);
 
     // ------------------------------------------------------------------- errors
 
@@ -118,23 +161,37 @@ contract Syndicate {
     error BadSignature();
     error NonceUsed();
     error InsufficientShares();
+    error BadTerm();
+
+    constructor(address validationRegistry_) {
+        validationRegistry = IValidationRegistry(validationRegistry_);
+    }
 
     // --------------------------------------------------------------- registry
 
-    function registerAgent(bytes32 agentId, address runtimeKey, string calldata endpoint) external {
-        if (agents[agentId].registered) revert AlreadyRegistered();
+    function registerAgent(
+        bytes32 agentId,
+        uint256 erc8004Id,
+        address runtimeKey,
+        bytes32 modelFamily,
+        string calldata endpoint
+    ) external {
+        Agent storage a = agents[agentId];
+        if (a.registered) revert AlreadyRegistered();
         if (runtimeKey == address(0)) revert BadSignature();
-        agents[agentId].runtimeKey = runtimeKey;
-        agents[agentId].endpoint = endpoint;
-        agents[agentId].registered = true;
-        emit AgentRegistered(agentId, runtimeKey, endpoint);
+        a.runtimeKey = runtimeKey;
+        a.erc8004Id = erc8004Id;
+        a.modelFamily = modelFamily;
+        a.endpoint = endpoint;
+        a.registered = true;
+        emit AgentRegistered(agentId, erc8004Id, runtimeKey, modelFamily, endpoint);
     }
 
     // ------------------------------------------------------------ underwriting
 
-    /// @notice Stake capital behind an agent. Shares are priced against the live
-    ///         pool, so a depositor joining after losses buys in at the marked-down
-    ///         value and one joining after premium income pays the marked-up value.
+    /// @notice Stake capital behind one agent — the junior tranche. Shares are
+    ///         priced against the live pool, so a depositor joining after losses
+    ///         buys in at the marked-down value.
     function underwrite(bytes32 agentId) external payable {
         Agent storage a = agents[agentId];
         if (!a.registered) revert UnknownAgent();
@@ -148,9 +205,6 @@ contract Syndicate {
         emit Underwritten(agentId, msg.sender, msg.value, issued);
     }
 
-    /// @notice Redeem shares for their current value. Capital committed as
-    ///         outstanding exposure cannot be withdrawn — underwriters cannot
-    ///         exit a risk they are still carrying.
     function withdraw(bytes32 agentId, uint256 shareAmount) external {
         Agent storage a = agents[agentId];
         if (sharesOf[agentId][msg.sender] < shareAmount) revert InsufficientShares();
@@ -167,46 +221,102 @@ contract Syndicate {
         emit Withdrawn(agentId, msg.sender, shareAmount, value);
     }
 
+    /// @notice Deposit into the shared reinsurance book — the senior tranche,
+    ///         diversified across every agent. It earns a cession of all premium
+    ///         and carries the same share of every loss.
+    function depositReinsurance() external payable {
+        if (msg.value == 0) revert ZeroAmount();
+        uint256 issued = bookShares == 0 ? msg.value : (msg.value * bookShares) / bookCapital;
+        bookShares += issued;
+        bookCapital += msg.value;
+        bookSharesOf[msg.sender] += issued;
+        emit ReinsuranceDeposited(msg.sender, msg.value, issued);
+    }
+
+    function withdrawReinsurance(uint256 shareAmount) external {
+        if (bookSharesOf[msg.sender] < shareAmount) revert InsufficientShares();
+        uint256 value = (shareAmount * bookCapital) / bookShares;
+        if (bookCapital - value < bookExposure) revert InsufficientCapacity();
+
+        bookSharesOf[msg.sender] -= shareAmount;
+        bookShares -= shareAmount;
+        bookCapital -= value;
+
+        (bool ok,) = msg.sender.call{value: value}("");
+        require(ok, "transfer failed");
+        emit ReinsuranceWithdrawn(msg.sender, shareAmount, value);
+    }
+
     // ------------------------------------------------------------------ pricing
 
-    /// @notice The rate the market charges to carry `cover` on this agent, in bps.
-    /// @dev This is the trust signal. It is a price, not a score: it rises with
-    ///      observed breaches, rises when the agent is unproven, and rises as the
-    ///      pool's free capacity is consumed.
-    function rateBps(bytes32 agentId, uint256 cover) public view returns (uint256) {
+    /// @notice The rate the market charges to carry `cover` on this agent for
+    ///         `termDays`, in bps. This is the trust signal: a price, not a score.
+    function rateBps(bytes32 agentId, uint256 cover, uint256 termDays) public view returns (uint256) {
         Agent storage a = agents[agentId];
         if (!a.registered) revert UnknownAgent();
-        if (a.pool == 0 || a.pool < a.exposure + cover) revert InsufficientCapacity();
+        if (termDays == 0) revert BadTerm();
 
-        uint256 rate = BASE_RATE_BPS;
+        uint256 ceded = (cover * CESSION_BPS) / BPS;
+        uint256 retained = cover - ceded;
+        if (a.pool == 0 || a.pool < a.exposure + retained) revert InsufficientCapacity();
+        if (bookCapital < bookExposure + ceded) revert InsufficientCapacity();
 
-        // Loss experience, credibility-weighted. With few trials the observed
-        // ratio is noisy, so it is blended against the unproven loading rather
-        // than trusted outright — standard actuarial credibility, and it stops a
-        // brand-new agent from buying a clean record with two cheap successes.
+        // Idiosyncratic risk: this agent's own loss experience, credibility
+        // weighted. With few trials the observed ratio is noisy, so it is blended
+        // against the unproven loading rather than trusted outright — and a
+        // brand-new agent cannot buy a clean record with two cheap successes.
         uint256 t = a.trials;
         uint256 observedBps = t == 0 ? 0 : (uint256(a.failures) * BPS) / t;
         uint256 credibility = t >= CREDIBILITY_TRIALS ? BPS : (t * BPS) / CREDIBILITY_TRIALS;
 
-        rate += (observedBps * FAILURE_LOAD_BPS * credibility) / (BPS * BPS);
-        rate += (UNPROVEN_LOAD_BPS * (BPS - credibility)) / BPS;
+        uint256 risk = (observedBps * FAILURE_LOAD_BPS * credibility) / (BPS * BPS);
+        risk += (UNPROVEN_LOAD_BPS * (BPS - credibility)) / BPS;
 
-        // Capacity utilisation after this policy is bound.
-        uint256 utilisation = ((a.exposure + cover) * BPS) / a.pool;
-        rate += (utilisation * UTILISATION_LOAD_BPS) / BPS;
+        // Capacity: a pool near its limit prices up.
+        risk += (((a.exposure + retained) * BPS) / a.pool * UTILISATION_LOAD_BPS) / BPS;
 
-        return rate;
+        // Systemic: correlated exposure to this agent's model family.
+        risk += _concentrationLoad(a.modelFamily, cover);
+
+        // Term structure: risk accrues with exposure time, the floor does not.
+        // A 90-day policy carries three times the chance of meeting a bad day.
+        return BASE_RATE_BPS + (risk * termDays) / BASE_TERM_DAYS;
     }
 
-    function quote(bytes32 agentId, uint256 cover) public view returns (uint256 premium) {
-        premium = (cover * rateBps(agentId, cover)) / BPS;
+    /// @notice Surcharge for correlated exposure to one model family.
+    /// @dev The gap a per-agent pool cannot see. Agents sharing a base model share
+    ///      its failure modes: one newly discovered injection technique against
+    ///      that model breaches every agent built on it in the same afternoon.
+    ///      Losses that a diversified book treats as independent arrive together,
+    ///      so exposure concentrated in a single family is priced up. This is the
+    ///      agent-economy analogue of writing every policy on one flood plain.
+    function _concentrationLoad(bytes32 modelFamily, uint256 cover) private view returns (uint256) {
+        if (bookCapital == 0) return CONCENTRATION_LOAD_BPS;
+        uint256 share = ((familyExposure[modelFamily] + cover) * BPS) / bookCapital;
+        if (share > BPS) share = BPS;
+        // Quadratic in the concentration share: diversified books are barely
+        // touched, and the surcharge bites hard as one family dominates.
+        return (share * share * CONCENTRATION_LOAD_BPS) / (BPS * BPS);
+    }
+
+    function quote(bytes32 agentId, uint256 cover, uint256 termDays) public view returns (uint256) {
+        return (cover * rateBps(agentId, cover, termDays)) / BPS;
+    }
+
+    /// @notice Convenience overloads quoting the reference 30-day term.
+    function rateBps(bytes32 agentId, uint256 cover) external view returns (uint256) {
+        return rateBps(agentId, cover, BASE_TERM_DAYS);
+    }
+
+    function quote(bytes32 agentId, uint256 cover) external view returns (uint256) {
+        return quote(agentId, cover, BASE_TERM_DAYS);
     }
 
     // ------------------------------------------------------------------ policy
 
     /// @notice Bind cover on a single upcoming payment to `expectedRecipient`.
-    function bindPolicy(bytes32 agentId, address expectedRecipient, uint256 cover)
-        external
+    function bindPolicy(bytes32 agentId, address expectedRecipient, uint256 cover, uint256 termDays)
+        public
         payable
         returns (uint256 policyId)
     {
@@ -214,14 +324,21 @@ contract Syndicate {
         if (!a.registered) revert UnknownAgent();
         if (cover == 0) revert ZeroAmount();
 
-        uint256 rate = rateBps(agentId, cover);
+        uint256 rate = rateBps(agentId, cover, termDays);
         uint256 premium = (cover * rate) / BPS;
         if (msg.value != premium) revert PremiumMismatch(premium, msg.value);
 
-        // Premium income accrues to the pool, lifting every share's value. This is
-        // what pays underwriters for carrying the risk.
-        a.pool += msg.value;
-        a.exposure += cover;
+        uint256 ceded = (cover * CESSION_BPS) / BPS;
+        uint256 cededPremium = (premium * CESSION_BPS) / BPS;
+
+        // Premium is split on the same quota share as the risk: the book is paid
+        // for the losses it agrees to carry.
+        a.pool += premium - cededPremium;
+        bookCapital += cededPremium;
+
+        a.exposure += cover - ceded;
+        bookExposure += ceded;
+        familyExposure[a.modelFamily] += cover;
 
         policyId = nextPolicyId++;
         policies[policyId] = Policy({
@@ -230,15 +347,24 @@ contract Syndicate {
             expectedRecipient: expectedRecipient,
             cover: cover,
             premium: premium,
+            ceded: ceded,
+            termDays: uint32(termDays),
             resolved: false
         });
 
-        emit PolicyBound(policyId, agentId, msg.sender, cover, premium, rate);
+        emit PolicyBound(policyId, agentId, msg.sender, cover, premium, rate, ceded);
+        _requestValidation(agentId, policyId);
+    }
+
+    function bindPolicy(bytes32 agentId, address expectedRecipient, uint256 cover)
+        external
+        payable
+        returns (uint256)
+    {
+        return bindPolicy(agentId, expectedRecipient, cover, BASE_TERM_DAYS);
     }
 
     /// @notice The digest an agent runtime must sign for a payment receipt.
-    /// @dev Binds the chain id and this contract's address so a receipt cannot be
-    ///      replayed onto another deployment.
     function receiptDigest(uint256 policyId, address actualRecipient, uint256 amount, uint256 nonce)
         public
         view
@@ -247,16 +373,16 @@ contract Syndicate {
         return keccak256(abi.encode(block.chainid, address(this), policyId, actualRecipient, amount, nonce));
     }
 
+    /// @notice Stable handle for a policy's ERC-8004 validation record.
+    function validationRequestHash(uint256 policyId) public view returns (bytes32) {
+        return keccak256(abi.encode(block.chainid, address(this), "syndicate.policy", policyId));
+    }
+
     /// @notice Submit the agent's signed record of what it actually paid, and to whom.
-    /// @dev This is the only path that writes loss experience, and it demands a
-    ///      signature from the agent's own runtime key. That is what makes the
-    ///      record grounded in a verifiable interaction — the property arXiv:2606.26028
-    ///      found missing from the ERC-8004 Reputation Registry, where feedback is
-    ///      "rarely grounded in verifiable interactions".
-    ///
-    ///      A breach settles atomically: the beneficiary is made whole and the loss
-    ///      falls on the pool in the same transaction that records the failure, so
-    ///      the price and the payout can never disagree.
+    /// @dev The only path that writes loss experience, and it demands a signature
+    ///      from the agent's own runtime key — the grounding that arXiv:2606.26028
+    ///      found missing from the ERC-8004 Reputation Registry. A breach settles
+    ///      atomically, so the price and the payout can never disagree.
     function submitReceipt(
         uint256 policyId,
         address actualRecipient,
@@ -265,8 +391,7 @@ contract Syndicate {
         bytes calldata signature
     ) external {
         Policy storage p = policies[policyId];
-        if (p.cover == 0) revert PolicyResolved();
-        if (p.resolved) revert PolicyResolved();
+        if (p.cover == 0 || p.resolved) revert PolicyResolved();
 
         Agent storage a = agents[p.agentId];
         if (usedNonce[p.agentId][nonce]) revert NonceUsed();
@@ -276,23 +401,56 @@ contract Syndicate {
 
         usedNonce[p.agentId][nonce] = true;
         p.resolved = true;
-        a.exposure -= p.cover;
+
+        uint256 retained = p.cover - p.ceded;
+        a.exposure -= retained;
+        bookExposure -= p.ceded;
+        familyExposure[a.modelFamily] -= p.cover;
         a.trials += 1;
 
         emit ReceiptAccepted(policyId, p.agentId, actualRecipient, amount);
 
-        if (actualRecipient != p.expectedRecipient) {
+        bool breached = actualRecipient != p.expectedRecipient;
+        if (breached) {
             a.failures += 1;
             emit Breach(policyId, p.agentId, p.expectedRecipient, actualRecipient);
 
-            uint256 payout = p.cover > a.pool ? a.pool : p.cover;
-            a.pool -= payout;
-            emit PoolSlashed(p.agentId, payout, a.pool);
+            // Quota share in the loss direction: the junior tranche pays its
+            // retention, the book pays its cession, each capped by what it holds.
+            uint256 fromPool = retained > a.pool ? a.pool : retained;
+            uint256 fromBook = p.ceded > bookCapital ? bookCapital : p.ceded;
 
+            a.pool -= fromPool;
+            bookCapital -= fromBook;
+            emit PoolSlashed(p.agentId, fromPool, a.pool);
+            emit BookSlashed(p.agentId, fromBook, bookCapital);
+
+            uint256 payout = fromPool + fromBook;
             (bool ok,) = p.beneficiary.call{value: payout}("");
             require(ok, "payout failed");
             emit ClaimPaid(policyId, p.agentId, p.beneficiary, payout);
         }
+
+        _respondValidation(p.agentId, policyId, breached ? RESPONSE_BREACH : RESPONSE_CLEAN, digest);
+    }
+
+    // ------------------------------------------------------------- ERC-8004 I/O
+
+    function _requestValidation(bytes32 agentId, uint256 policyId) private {
+        if (address(validationRegistry) == address(0)) return;
+        validationRegistry.validationRequest(
+            address(this), agents[agentId].erc8004Id, "syndicate://policy", validationRequestHash(policyId)
+        );
+    }
+
+    /// @dev Writes the settlement outcome back to the ERC-8004 Validation Registry
+    ///      so any agent already reading the standard sees a verdict that is
+    ///      backed by capital rather than by an unaccountable review.
+    function _respondValidation(bytes32 agentId, uint256 policyId, uint8 response, bytes32 receiptHash) private {
+        if (address(validationRegistry) == address(0)) return;
+        bytes32 requestHash = validationRequestHash(policyId);
+        validationRegistry.validationResponse(requestHash, response, "syndicate://settlement", receiptHash, VALIDATION_TAG);
+        emit ValidationWritten(agentId, agents[agentId].erc8004Id, requestHash, response);
     }
 
     // ------------------------------------------------------------------- views
@@ -306,10 +464,19 @@ contract Syndicate {
         return (a.pool, a.exposure, a.trials, a.failures, a.shares);
     }
 
+    function bookStats() external view returns (uint256 capital, uint256 exposure, uint256 shares) {
+        return (bookCapital, bookExposure, bookShares);
+    }
+
     function shareValue(bytes32 agentId, address underwriter) external view returns (uint256) {
         Agent storage a = agents[agentId];
         if (a.shares == 0) return 0;
         return (sharesOf[agentId][underwriter] * a.pool) / a.shares;
+    }
+
+    function reinsuranceValue(address underwriter) external view returns (uint256) {
+        if (bookShares == 0) return 0;
+        return (bookSharesOf[underwriter] * bookCapital) / bookShares;
     }
 
     // -------------------------------------------------------------- signatures
